@@ -1,0 +1,108 @@
+#output playmaker
+
+.declarations
+#declare chunk_idx = 0
+#declare chunk_cnt = 0
+#define chunk_max = 10
+
+#declare vidx, idx
+#declare cursor_x = 0
+#declare cursor_y = 0
+
+#declare v$(5,chunk_max)
+
+#declare key$
+#declare valid$="cdefgab0123456789 #$.hiqrswotuxmpl"
+#declare val$
+
+.main
+  key off
+  gosub draw_editor_screen
+  gosub user_input
+  goto main
+
+.draw_editor_screen
+  cursor 0,0:print "playmaker v0.01 - by  gurce isikyildiz"
+  gosub draw_current_chunk
+  return
+
+.draw_current_chunk
+  for vidx=0 to 5
+    if cursor_y <> vidx then begin
+      cursor 0,3+vidx:print chr$(27);"q";"v";vidx;": ";v$(vidx,chunk_idx);
+    bend:else begin
+      cursor 0,3+vidx:print chr$(27);"q";"v";vidx;": ";
+      for idx=1 to len(v$(vidx,chunk_idx))
+        if cursor_x = idx-1 then begin
+          print "{x12}";mid$(v$(vidx,chunk_idx),idx,1);"{x92}";
+        bend:else begin
+          print mid$(v$(vidx,chunk_idx),idx,1);
+        bend
+      next idx
+      if len(v$(vidx,chunk_idx)) = 0 or cursor_x=len(v$(vidx,chunk_idx)) then print "{x12} {x92}";
+    bend
+  next vidx
+  return
+        
+.check_valid_key
+  for idx=1 to len(valid$)
+    val$=mid$(valid$,idx,1)
+    if key$= val$ then begin
+      if cursor_x < len(v$(cursor_y,chunk_idx)) then begin
+        v$(cursor_y,chunk_idx) = left$(v$(cursor_y,chunk_idx),cursor_x) {x5F}
+          + val$ + mid$(v$(cursor_y,chunk_idx),cursor_x+1)
+        cursor_x=cursor_x+1
+        return
+      bend
+      v$(cursor_y,chunk_idx)=v$(cursor_y,chunk_idx)+val$
+      cursor_x=cursor_x+1
+      return
+    bend
+  next idx
+  return
+
+.user_input
+  getkey key$
+
+  ' down arrow?
+  if key$="{x11}" and cursor_y<5 then begin
+    cursor_y = cursor_y + 1
+    if cursor_x > len(v$(cursor_y,chunk_idx)) then cursor_x = {x5F}
+      len(v$(cursor_y,chunk_idx))
+  bend
+
+  ' up arrow?
+  if key$="{x91}" and cursor_y>0 then begin
+    cursor_y = cursor_y - 1
+    if cursor_x > len(v$(cursor_y,chunk_idx)) then {x5F}
+      cursor_x = len(v$(cursor_y,chunk_idx))
+  bend
+
+  ' right arrow?
+  if key$="{x1D}" and cursor_x < len(v$(cursor_y,chunk_idx)) then begin
+    cursor_x=cursor_x+1
+  bend
+
+  ' left arrow?
+  if key$="{x9D}" and cursor_x > 0 then cursor_x=cursor_x-1
+
+  ' backspace (inst/del)?
+  if key$="{x14}" and cursor_x > 0 then begin
+    v$(cursor_y,chunk_idx)=left$(v$(cursor_y,chunk_idx),cursor_x-1) {x5F}
+      + mid$(v$(cursor_y,chunk_idx),cursor_x+1)
+    cursor_x=cursor_x-1
+  bend
+
+  ' F1=play row
+  if key$="{x85}" then play v$(cursor_y,chunk_idx)
+
+  ' F3=play all channels
+  if key$="{x86}" then begin
+    play v$(0,chunk_idx), v$(1,chunk_idx), {x5F}
+    v$(2,chunk_idx), v$(3,chunk_idx), v$(4,chunk_idx), {x5F}
+    v$(5,chunk_idx)
+  bend
+
+  gosub check_valid_key
+  return
+ÿ
