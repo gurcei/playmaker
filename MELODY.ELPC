@@ -108,9 +108,41 @@ print "{x93}"
 
   return
 
+.load
+'----
+  input "load name: ";key$
+  if key$="" then return
+
+  dopen #2,(key$),r,u8
+  for chunk_idx = 0 to chunk_max-1
+    for vidx=0 to 5
+      input #2,v$(vidx, chunk_idx)
+    next vidx
+  next chunk_idx
+
+  chunk_idx = 0
+  return
+
 .save
 '----
   input "save name: ";key$
+  if key$="" then return
+  
+  delete (key$)
+  dopen #2,(key$),w,u8
+  for chunk_idx = 0 to chunk_max-1
+    for vidx=0 to 5
+      print #2,v$(vidx, chunk_idx)
+    next vidx
+  next chunk_idx
+  dclose #2
+
+  chunk_idx = 0
+  return
+
+.save_as_text
+'------------
+  input "save (as text) name: ";key$
   if key$="" then return
 
   delete (key$)
@@ -125,6 +157,7 @@ print "{x93}"
   next chunk_idx
   dclose #2
 
+  chunk_idx = 0
   return
 
 .user_input
@@ -189,8 +222,12 @@ print "{x93}"
   if key$="-" then tmpo%=tmpo%-1
   if key$="+" then tmpo%=tmpo%+1
 
-  ' F3 = save
+  if key$="«" then key on:end
+  if key$="{x85}" then gosub load
   if key$="{x86}" then gosub save
+
+  ' F4 = save as text
+  if key$="{x8A}" then gosub save_as_text
 
   ' return=play row
   if key$=chr$(13) then tempo tmpo% : play v$(cursor_y,chunk_idx)
