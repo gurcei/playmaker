@@ -1,5 +1,7 @@
 #output playmaker
 
+trap runstop_trapper
+
 .declarations
 '------------
 #declare chunk_idx = 0
@@ -36,15 +38,15 @@ print "{x93}"
 
 .draw_current_chunk
 '------------------
-  print
+  print "{x93}"
   print "tempo:      {x9D}{x9D}{x9D}{x9D}{x9D}"; tmpo%
   print "chunk_idx:    {x9D}{x9D}{x9D}"; chunk_idx  
    
   for vidx=0 to 5
     if cursor_y <> vidx then begin
-      cursor 0,5+vidx:print chr$(27);"q";"v";vidx;": ";v$(vidx,chunk_idx);
+      cursor 0,5+vidx*2:print chr$(27);"q";"v";vidx;": ";v$(vidx,chunk_idx);
     bend:else begin
-      cursor 0,5+vidx:print chr$(27);"q";"v";vidx;": ";
+      cursor 0,5+vidx*2:print chr$(27);"q";"v";vidx;": ";
       for idx=1 to len(v$(vidx,chunk_idx))
         if cursor_x = idx-1 then begin
           print "{x12}";mid$(v$(vidx,chunk_idx),idx,1);"{x92}";
@@ -119,6 +121,9 @@ print "{x93}"
       input #2,v$(vidx, chunk_idx)
     next vidx
   next chunk_idx
+  input #2,tmpo%
+
+  dclose #2
 
   chunk_idx = 0
   return
@@ -135,6 +140,8 @@ print "{x93}"
       print #2,v$(vidx, chunk_idx)
     next vidx
   next chunk_idx
+  print #2,tmpo%
+
   dclose #2
 
   chunk_idx = 0
@@ -242,4 +249,13 @@ print "{x93}"
 
   gosub check_valid_key
   return
+
+
+.runstop_trapper
+'---------------
+  if er=30 then resume  ' ignore run/stop
+  trap
+  print err$(er);" error"
+  print " in lne";el
+  end
 ÿ
