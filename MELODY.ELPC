@@ -1,5 +1,25 @@
 #output playmaker
 
+' Keys:
+' ----
+'    Up arrow = Move to previous voice
+'  Down arrow = Move to next voice
+'  Left arrow = Move left within currrent voie string
+' Right arrow = Move right within current voie string
+'    INST/DEL = Delete char in current voice string
+'       ESC,J = Move to start of current voice string
+'       ESC,K = Move to end of current voice string
+'      CTRL+W = Move forward one word in current voice string
+'      CTRL+U = Move back one word in current voice string
+'           < = Show previous song chunk
+'           > = Show next song chunk
+'           - = Decrease tempo
+'           + = Increase tempo
+'       ALT+Q = Quit program
+'          F1 = Load
+'          F3 = Save
+'          F7 = Envelope editor
+
 trap runstop_trapper
 
 .declarations
@@ -20,6 +40,50 @@ trap runstop_trapper
 #declare tmpo% = 12
 
 #declare esc_flag% = 0
+
+#struct ENVTYPE attack, decay, sustain, release, waveform, pw
+
+ENVTYPE envs(9) = [ {x5F}
+  [  0,  9,  0,  0,  2, 1536 ], {x5F}
+  [ 12,  0, 12,  0,  1,    0 ], {x5F}
+  [  0,  0, 15,  0,  0,    0 ], {x5F}
+  [  0,  5,  5,  0,  3,    0 ], {x5F}
+  [  9,  4,  4,  0,  0,    0 ], {x5F}
+  [  0,  9,  2,  1,  1,    0 ], {x5F}
+  [  0,  9,  0,  0,  2,  512 ], {x5F}
+  [  0,  9,  9,  0,  2, 2048 ], {x5F}
+  [  8,  9,  4,  1,  2,  512 ], {x5F}
+  [  0,  9,  0,  0,  0,    0 ]  {x5F}
+]
+
+#declare row, col, srow, scol, a$, v, maxv
+
+#struct KEY_TYPE in$, out$
+
+KEY_TYPE keys(11) = [ {x5F}
+  [ "a", "c", ], {x5F}
+  [ "w", "#c", ], {x5F}
+  [ "s", "d", ], {x5F}
+  [ "e", "#d", ], {x5F}
+  [ "d", "e", ], {x5F}
+  [ "f", "f", ], {x5F}
+  [ "t", "#f", ], {x5F}
+  [ "g", "g", ], {x5F}
+  [ "y", "#g", ], {x5F}
+  [ "h", "a", ], {x5F}
+  [ "u", "#a", ], {x5F}
+  [ "j", "b", ] {x5F}
+]
+
+#declare pstr$, k, delta
+
+#declare wname$(4)
+wname$(0) = "TRI"
+wname$(1) = "SAW"
+wname$(2) = "PULSE"
+wname$(3) = "NOISE"
+wname$(4) = "RING"
+
 
 print "{x93}"
 
@@ -232,6 +296,7 @@ print "{x93}"
   if key$="«" then key on:end
   if key$="{x85}" then gosub load
   if key$="{x86}" then gosub save
+  if key$="{x88}" then gosub envelope_editor
 
   ' F4 = save as text
   if key$="{x8A}" then gosub save_as_text
@@ -250,6 +315,131 @@ print "{x93}"
   gosub check_valid_key
   return
 
+
+.envelope_editor
+'---------------
+  do while 1
+    gosub draw_table
+    gosub get_user_input_for_table
+
+    ' alt+q to exit
+    if a$="«" then exit
+  loop
+  return
+
+
+.draw_table
+'----------
+  print "{x93}env editor"
+  print " ----------"
+  print
+  print "   ATTACK";chr$(9);"DECAY";chr$(9);"SUSTAIN";chr$(9);"RELEASE";chr$(9);
+  print "WAVEFRM";chr$(9);"PULSEWIDTH"
+
+  for row = 0 to 9
+    print row;" : ";
+    col = 0 : v = envs_attack(row)
+    gosub show_cell
+    col = 1 : v = envs_decay(row)
+    gosub show_cell
+    col = 2 : v = envs_sustain(row)
+    gosub show_cell
+    col = 3 : v = envs_release(row)
+    gosub show_cell
+    col = 4 : v = envs_waveform(row)
+    gosub show_cell
+    col = 5 : v = envs_pw(row)
+    gosub show_cell
+    print
+  next row
+  return
+
+.get_val
+'-------
+  if scol = 0 then v = envs_attack(srow)
+  if scol = 1 then v = envs_decay(srow)
+  if scol = 2 then v = envs_sustain(srow)
+  if scol = 3 then v = envs_release(srow)
+  if scol = 4 then v = envs_waveform(srow)
+  if scol = 5 then v = envs_pw(srow)
+
+  return
+
+.show_cell
+'---------
+  if srow=row and scol = col then print "{x12}";:else print "{x92}";
+
+  if col = 4 then begin
+    print wname$(v);chr$(9);"{x92}";    
+  bend:else begin
+    print v;chr$(9);"{x92}";
+  bend
+  return
+
+
+#declare outkey$(10)
+.get_user_input_for_table
+'------------------------
+  get key a$
+  if a$ = "{x9D}" and scol > 0 then scol = scol - 1
+  if a$ = "{x1D}" and scol < 5 then scol = scol + 1
+  if a$ = "{x91}" and srow > 0 then srow = srow - 1
+  if a$ = "{x11}" and srow < 9 then srow = srow + 1
+  if a$ = "+" then delta=1 : gosub incr_val
+  if a$ = "-" then delta=1 : gosub decr_val
+  if a$ = "Û" then delta=100 : gosub incr_val
+  if a$ = "Ý" then delta=100 : gosub decr_val
+
+
+  gosub check_piano_keys
+  return
+
+
+.check_piano_keys
+'----------------
+  pstr$ = ""
+  for k = 0 to 11
+    if a$ = keys_in$(k) then pstr$ = keys_out$(k)
+  next k
+
+  if len(pstr$)>0 then begin
+    play "o5qt"+str$(srow)+pstr$
+  bend
+
+  return
+
+.incr_val
+'--------
+  gosub get_val
+
+  maxv = 15
+  if scol = 4 then maxv = 4
+  if scol = 5 then maxv = 4095
+  v = v + delta
+  if v > maxv then v = maxv
+  gosub apply_val
+  return
+
+.decr_val
+'--------
+  gosub get_val
+
+  v = v - delta
+  if v < 0 then v = 0
+  gosub apply_val
+  return
+
+.apply_val
+'---------
+  if scol=0 then envs_attack(srow) = v
+  if scol=1 then envs_decay(srow) = v
+  if scol=2 then envs_sustain(srow) = v
+  if scol=3 then envs_release(srow) = v
+  if scol=4 then envs_waveform(srow) = v
+  if scol=5 then envs_pw(srow) = v
+
+  envelope srow, envs_attack(srow), envs_decay(srow), envs_sustain(srow), envs_release(srow), envs_waveform(srow), envs_pw(srow)
+  return
 
 .runstop_trapper
 '---------------
