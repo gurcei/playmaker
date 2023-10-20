@@ -15,10 +15,11 @@
 '           > = Show next song chunk
 '           - = Decrease tempo
 '           + = Increase tempo
-'       ALT+Q = Quit program
+'      MEGA+Q = Quit program / Exit Env Editor
 '          F1 = Load
 '          F3 = Save
 '          F7 = Envelope editor
+'          F8 = Filter editor
 
 trap runstop_trapper
 
@@ -84,7 +85,27 @@ wname$(2) = "PULSE"
 wname$(3) = "NOISE"
 wname$(4) = "RING"
 
+#define KEY_UP = "{x91}"
+#define KEY_DOWN = "{x11}"
+#define KEY_LEFT = "{x9D}"
+#define KEY_RIGHT = "{x1D}"
+#define KEY_DEL = "{x14}"
+#define KEY_CTRL_W = "{x17}"
+#define KEY_CTRL_U = "{x15}"
+#define KEY_MEGA_Q = "«"
+#define KEY_F1 = "{x85}"
+#define KEY_F3 = "{x86}"
+#define KEY_F4 = "{x8A}"
+#define KEY_F7 = "{x88}"
+#define KEY_F8 = "{x8C}"
+#define KEY_RETURN = chr$(13)
+#define KEY_ESCAPE = chr$(27)
+#define KEY_SHIFT_RETURN = chr$(141)
+#define KEY_SHIFT_PLUS = "Û"
+#define KEY_SHIFT_MINUS = "Ý"
 
+.init
+'----
 print "{x93}"
 play : play ""
 
@@ -263,34 +284,35 @@ play : play ""
   chunk_idx = 0
   return
 
+
 .user_input
 '----------
   getkey key$
 
   ' down arrow?
-  if key$="{x11}" and cursor_y<5 then begin
+  if key$ = KEY_DOWN and cursor_y<5 then begin
     cursor_y = cursor_y + 1
     if cursor_x > len(v$(cursor_y,chunk_idx)) then cursor_x = {x5F}
       len(v$(cursor_y,chunk_idx))
   bend
 
   ' up arrow?
-  if key$="{x91}" and cursor_y>0 then begin
+  if key$ = KEY_UP and cursor_y>0 then begin
     cursor_y = cursor_y - 1
     if cursor_x > len(v$(cursor_y,chunk_idx)) then {x5F}
       cursor_x = len(v$(cursor_y,chunk_idx))
   bend
 
   ' right arrow?
-  if key$="{x1D}" and cursor_x < len(v$(cursor_y,chunk_idx)) then begin
+  if key$ = KEY_RIGHT and cursor_x < len(v$(cursor_y,chunk_idx)) then begin
     cursor_x=cursor_x+1
   bend
 
   ' left arrow?
-  if key$="{x9D}" and cursor_x > 0 then cursor_x=cursor_x-1
+  if key$ = KEY_LEFT and cursor_x > 0 then cursor_x=cursor_x-1
 
   ' backspace (inst/del)?
-  if key$="{x14}" and cursor_x > 0 then begin
+  if key$ = KEY_DEL and cursor_x > 0 then begin
     v$(cursor_y,chunk_idx)=left$(v$(cursor_y,chunk_idx),cursor_x-1) {x5F}
       + mid$(v$(cursor_y,chunk_idx),cursor_x+1)
     cursor_x=cursor_x-1
@@ -303,20 +325,20 @@ play : play ""
     key$=""
   bend
 
-  if key$=chr$(27) then esc_flag%=abs(esc_flag%-1)
+  if key$ = KEY_ESCAPE then esc_flag%=abs(esc_flag%-1)
 
   ' ctrl-w = forward one word
-  if key$="{x17}" then gosub forward_word
+  if key$ = KEY_CTRL_W then gosub forward_word
 
   ' ctrl-u = back one word
-  if key$="{x15}" then gosub previous_word
+  if key$ = KEY_CTRL_U then gosub previous_word
 
   ' < / > = previous/next chunk
-  if key$="<" and chunk_idx>0 then begin
+  if key$ = "<" and chunk_idx>0 then begin
     chunk_idx=chunk_idx-1
     cursor_x=0
   bend
-  if key$=">" and chunk_idx<chunk_max then begin
+  if key$ = ">" and chunk_idx<chunk_max then begin
     chunk_idx=chunk_idx+1
     cursor_x=0
   bend
@@ -325,25 +347,25 @@ play : play ""
   if key$="-" then tmpo%=tmpo%-1
   if key$="+" then tmpo%=tmpo%+1
 
-  ' alt-q = exit
-  if key$="«" then begin
+  ' mega-q = exit
+  if key$ = KEY_MEGA_Q then begin
     print "are you sure? (y/n)"
     get key a$
     if a$="y" then key on:end
   bend
 
-  if key$="{x85}" then gosub load
-  if key$="{x86}" then gosub save
-  if key$="{x88}" then gosub envelope_editor
+  if key$ = KEY_F1 then gosub load
+  if key$ = KEY_F3 then gosub save
+  if key$ = KEY_F7 then gosub envelope_editor
 
   ' F4 = save as text
-  if key$="{x8A}" then gosub save_as_text
+  if key$ = KEY_F4 then gosub save_as_text
 
   ' return=play row
-  if key$=chr$(13) then tempo tmpo% : play v$(cursor_y,chunk_idx)
+  if key$ = KEY_RETURN then tempo tmpo% : play v$(cursor_y,chunk_idx)
 
   ' shift+return=play all channels
-  if key$=chr$(141) then begin
+  if key$ = KEY_SHIFT_RETURN then begin
     tempo tmpo%
     play v$(0,chunk_idx), v$(1,chunk_idx), {x5F}
     v$(2,chunk_idx), v$(3,chunk_idx), v$(4,chunk_idx), {x5F}
@@ -361,7 +383,7 @@ play : play ""
     gosub get_user_input_for_table
 
     ' alt+q to exit
-    if a$="«" then exit
+    if a$ = KEY_MEGA_Q then exit
   loop
   return
 
@@ -428,14 +450,14 @@ play : play ""
 .get_user_input_for_table
 '------------------------
   get key a$
-  if a$ = "{x9D}" and scol > 0 then scol = scol - 1
-  if a$ = "{x1D}" and scol < 6 then scol = scol + 1
-  if a$ = "{x91}" and srow > 0 then srow = srow - 1
-  if a$ = "{x11}" and srow < 9 then srow = srow + 1
+  if a$ = KEY_LEFT and scol > 0 then scol = scol - 1
+  if a$ = KEY_RIGHT and scol < 6 then scol = scol + 1
+  if a$ = KEY_UP and srow > 0 then srow = srow - 1
+  if a$ = KEY_DOWN and srow < 9 then srow = srow + 1
   if a$ = "+" then delta=1 : gosub incr_val
   if a$ = "-" then delta=1 : gosub decr_val
-  if a$ = "Û" then delta=100 : gosub incr_val
-  if a$ = "Ý" then delta=100 : gosub decr_val
+  if a$ = KEY_SHIFT_PLUS then delta=100 : gosub incr_val
+  if a$ = KEY_SHIFT_MINUS then delta=100 : gosub decr_val
   if a$ = chr$(13) and scol = 0 then gosub change_env_name
 
   gosub check_piano_keys
