@@ -654,21 +654,15 @@ play : play ""
   if fsel = -1 then return
   if curr_dir = DIR_NONE then return
 
-  print "{x13}";chr$(27);"qcurr_freq=";curr_freq;
+  print "{x13}";KEY_TAB;KEY_TAB;KEY_TAB;chr$(27);"qcurr_freq=";curr_freq;
   
   ' NOTE: Can't use SETBIT for SID registers as the regs are write-only
   '       (SETBIT will internally need a read prior to the write)
 
   ' BUG? I couldn't do POKE $D415 (it became 868691 = $D4153 ?!)
-  poke 54293, curr_freq and 7
-  poke 54294, curr_freq >> 3
-  'poke $d418, 16 + 10
-  'poke $d417, 1
+  wpoke 54293, (curr_freq and 7) + ((curr_freq >> 3) << 8)
 
-  poke 54293, curr_freq and 7
-  poke 54294, curr_freq >> 3
-  'poke $d438, 16 + 10
-  'poke $d437, 1
+  wpoke 54325, (curr_freq and 7) + ((curr_freq >> 3) << 8)
 
   if curr_dir = DIR_UP then begin
     curr_freq = curr_freq + filt_sweep(fsel)
@@ -783,6 +777,20 @@ play : play ""
     filt_res(fsrow) = v
   bend
 
+  if fscol=5 and filt_dir(fsrow) < 3 then filt_dir(fsrow) = filt_dir(fsrow) + 1
+
+  if fscol=6 and filt_min(fsrow) < 2047 then begin
+    v = filt_min(fsrow) + delta
+    if v > 2047 then v = 2047
+    filt_min(fsrow) = v
+  bend
+    
+  if fscol=7 and filt_sweep(fsrow) < 2047 then begin
+    v = filt_sweep(fsrow) + delta
+    if v > 2047 then v = 2047
+    filt_sweep(fsrow) = v
+  bend
+
   gosub apply_selected_filter
   return
 
@@ -803,6 +811,20 @@ play : play ""
     v = filt_res(fsrow) - delta
     if v < 0 then v = 0
     filt_res(fsrow) = v
+  bend
+
+  if fscol=5 and filt_dir(fsrow) > 0 then filt_dir(fsrow) = filt_dir(fsrow) - 1
+
+  if fscol=6 and filt_min(fsrow) > 0 then begin
+    v = filt_min(fsrow) - delta
+    if v < 0 then v = 0
+    filt_min(fsrow) = v
+  bend
+
+  if fscol=7 and filt_sweep(fsrow) > 0 then begin
+    v = filt_sweep(fsrow) - delta
+    if v < 0 then v = 0
+    filt_sweep(fsrow) = v
   bend
 
   gosub apply_selected_filter
