@@ -656,18 +656,19 @@ play : play ""
 
   print "{x13}";chr$(27);"qcurr_freq=";curr_freq;
   
-  poke $d415, curr_freq and 3
-  poke $d416, curr_freq >> 3
-  setbit $d418, 4
+  ' NOTE: Can't use SETBIT for SID registers as the regs are write-only
+  '       (SETBIT will internally need a read prior to the write)
 
-  poke $d435, curr_freq and 3
-  poke $d436, curr_freq >> 3
-  setbit $d438, 4
+  ' BUG? I couldn't do POKE $D415 (it became 868691 = $D4153 ?!)
+  poke 54293, curr_freq and 7
+  poke 54294, curr_freq >> 3
+  'poke $d418, 16 + 10
+  'poke $d417, 1
 
-  'filter 1, curr_freq, filt_lp(fsel), {x5F} 
-  '       filt_bp(fsel), filt_hp(fsel), filt_res(fsel)
-  'filter 2, curr_freq, filt_lp(fsel), {x5F} 
-  '       filt_bp(fsel), filt_hp(fsel), filt_res(fsel)
+  poke 54293, curr_freq and 7
+  poke 54294, curr_freq >> 3
+  'poke $d438, 16 + 10
+  'poke $d437, 1
 
   if curr_dir = DIR_UP then begin
     curr_freq = curr_freq + filt_sweep(fsel)
