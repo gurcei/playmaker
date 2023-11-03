@@ -57,6 +57,13 @@ ENVTYPE envs(9) = [ {x5F}
   [ "Xylophone",   0,  9,  0,  0,  0,    0 ]  {x5F}
 ]
 
+#struct FILTTYPE name$, freq, lp, bp, hp, res
+
+FILTTYPE filt(2) = [ {x5F}
+  [ "Right", 0, 0, 0, 0, 0 ], {x5F}
+  [ "Left",  0, 0, 0, 0, 0 ] {x5F}
+]
+
 #declare row, col, srow, scol, a$, v, maxv, v$
 
 #struct KEY_TYPE in$, out$
@@ -85,6 +92,12 @@ wname$(2) = "PULSE"
 wname$(3) = "NOISE"
 wname$(4) = "RING"
 
+#declare filt_state_name$(2)
+filt_state_name$(0) = "OFF"
+filt_state_name$(1) = "ON"
+
+#declare sidgrp = 1
+
 #define KEY_UP = "{x91}"
 #define KEY_DOWN = "{x11}"
 #define KEY_LEFT = "{x9D}"
@@ -103,6 +116,8 @@ wname$(4) = "RING"
 #define KEY_SHIFT_RETURN = chr$(141)
 #define KEY_SHIFT_PLUS = "Û"
 #define KEY_SHIFT_MINUS = "Ý"
+#define KEY_REV_ON = "{x12}"
+#define KEY_REV_OFF = "{x92}"
 
 .init
 '----
@@ -203,18 +218,24 @@ play : play ""
 
   dopen #2,(key$),r,u8
 
+  print "load melody"
   ' load melody chunks
   ' ------------------
   for chunk_idx = 0 to chunk_max-1
+    print "chunk_idx=";chunk_idx;", ";
     for vidx=0 to 5
       input #2,v$(vidx, chunk_idx)
     next vidx
   next chunk_idx
-  input #2,tmpo%
 
+  print: print "get tempo"
+  input #2,tmpo%
+  
+  print "load envelopes"
   ' load envelopes
   ' --------------
   for row = 0 to 9
+    print "row=";row;", ";
     input #2, envs_name$(row)
     input #2, envs_attack(row)
     input #2, envs_decay(row)
@@ -224,8 +245,11 @@ play : play ""
     input #2, envs_pw(row)
     gosub set_env
   next row
+  print
 
   dclose #2
+
+  get key a$
 
   chunk_idx = 0
   return
@@ -387,7 +411,6 @@ play : play ""
   loop
   return
 
-
 .draw_table
 '----------
   print "{x93}env editor"
@@ -412,9 +435,30 @@ play : play ""
     gosub show_cell
     col = 6 : v = envs_pw(row)
     gosub show_cell
-    print
   next row
+
+  print
+  print "filter editor"
+  print "-------------"
+  sidgrp = 1 : gosub show_filter
+  sidgrp = 2 : gosub show_filter
+
   return
+
+
+.show_filter
+'-----------
+  print
+  print "show_filter"
+  print "-----------";chr$(3);"freq";chr$(3);"lp";chr$(3);"bp";chr$(3);"hp";chr$(3);"res"
+  print "SIDS ";filt_name$(sidgrp);": ";chr$(3);
+  print filt_freq(sidgrp);chr$(3);
+  print filt_state_name$(filt_lp(sidgrp));chr$(3);
+  print filt_state_name$(filt_bp(sidgrp));chr$(3);
+  print filt_state_name$(filt_hp(sidgrp));chr$(3);
+  print filt_res(sidgrp)
+  return
+
 
 .get_val
 '-------
@@ -528,6 +572,7 @@ play : play ""
   if er=30 then resume  ' ignore run/stop
   trap
   print err$(er);" error"
-  print " in lne";el
+  print " in line";el
+  key on
   end
 ÿ
