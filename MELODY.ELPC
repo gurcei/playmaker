@@ -283,24 +283,19 @@ play : play ""
 
   dopen #2,(key$),r,u8
 
-  print "load melody"
   ' load melody chunks
   ' ------------------
   for chunk_idx = 0 to chunk_max-1
-    print "chunk_idx=";chunk_idx;", ";
     for vidx=0 to 5
       input #2,v$(vidx, chunk_idx)
     next vidx
   next chunk_idx
 
-  print: print "get tempo"
   input #2,tmpo%
   
-  print "load envelopes"
   ' load envelopes
   ' --------------
   for row = 0 to 9
-    print "row=";row;", ";
     input #2, envs_name$(row)
     input #2, envs_attack(row)
     input #2, envs_decay(row)
@@ -313,8 +308,6 @@ play : play ""
   print
 
   dclose #2
-
-  get key a$
 
   chunk_idx = 0
   return
@@ -376,7 +369,9 @@ play : play ""
 
 .user_input
 '----------
-  getkey key$
+  ' getkey key$
+  gosub read_key_loop
+  key$ = a$
 
   ' down arrow?
   if key$ = KEY_DOWN and cursor_y<5 then begin
@@ -654,15 +649,15 @@ play : play ""
   if fsel = -1 then return
   if curr_dir = DIR_NONE then return
 
-  print "{x13}";KEY_TAB;KEY_TAB;KEY_TAB;chr$(27);"qcurr_freq=";curr_freq;
+  print "{x13}";KEY_TAB;KEY_TAB;KEY_TAB;KEY_TAB;chr$(27);"qcurr_freq=";curr_freq;
   
   ' NOTE: Can't use SETBIT for SID registers as the regs are write-only
   '       (SETBIT will internally need a read prior to the write)
 
   ' BUG? I couldn't do POKE $D415 (it became 868691 = $D4153 ?!)
-  wpoke 54293, (curr_freq and 7) + ((curr_freq >> 3) << 8)
+  wpoke 54293, (curr_freq and 7) + ((curr_freq >> 3) * 256)
 
-  wpoke 54325, (curr_freq and 7) + ((curr_freq >> 3) << 8)
+  wpoke 54357, (curr_freq and 7) + ((curr_freq >> 3) * 256)
 
   if curr_dir = DIR_UP then begin
     curr_freq = curr_freq + filt_sweep(fsel)
