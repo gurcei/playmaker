@@ -98,7 +98,7 @@ filt_state_name$(1) = "ON"
 
 #declare sidgrp = 1
 
-#declare fscol = 0, fsrow = 0, ffocus = 0, fsel = 0
+#declare fscol = 0, fsrow = 0, ffocus = 0, fsel = -1
 
 
 .duration
@@ -493,6 +493,7 @@ play : play ""
 
 .show_filter
 '-----------
+  if fsel = sidgrp then print KEY_REV_ON;:else print KEY_REV_OFF;
   print "SIDS ";filt_name$(sidgrp);": ";KEY_TAB;
   if fsrow = sidgrp and fscol = 0 then print KEY_REV_ON;:else print KEY_REV_OFF;
   print filt_freq(sidgrp);KEY_TAB;
@@ -575,7 +576,7 @@ play : play ""
     if a$ = KEY_SHIFT_MINUS then delta = 100 : gosub decr_fval
 
     if a$ = KEY_RETURN then begin
-      fsel = mod(fsel + 1, 2)
+      if fsel = fsrow then fsel = -1:else fsel = fsrow
       gosub apply_selected_filter
     bend
 
@@ -599,10 +600,10 @@ play : play ""
 
 .apply_selected_filter
 '---------------------
-  filter 1, filt_freq(sidgrp), filt_lp(sidgrp), {x5F} 
-         filt_bp(sidgrp), filt_hp(sidgrp), filt_res(sidgrp)
-  filter 2, filt_freq(sidgrp), filt_lp(sidgrp), {x5F} 
-         filt_bp(sidgrp), filt_hp(sidgrp), filt_res(sidgrp)
+  filter 1, filt_freq(fsrow), filt_lp(fsrow), {x5F} 
+         filt_bp(fsrow), filt_hp(fsrow), filt_res(fsrow)
+  filter 2, filt_freq(fsrow), filt_lp(fsrow), {x5F} 
+         filt_bp(fsrow), filt_hp(fsrow), filt_res(fsrow)
 
   return
 
@@ -616,7 +617,7 @@ play : play ""
 '----------------
   ' apply filter
   pstr$ = "x0"
-  if fsel = 1 then pstr$ = "x1"
+  if fsel <> -1 then pstr$ = "x1"
 
   ' decide note length
   pstr$ = pstr$ + dur$(sdur, DCHAR)
