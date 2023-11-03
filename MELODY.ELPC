@@ -98,6 +98,46 @@ filt_state_name$(1) = "ON"
 
 #declare sidgrp = 1
 
+#declare fscol = 0, fsrow = 0, ffocus = 0, fsel = 0
+
+
+.duration
+'--------
+#define DNAME = 0
+#define DCHAR = 1
+#define DKEY  = 2
+
+#define D_WHOLE = 0
+#define D_HALF = 1
+#define D_QUARTER = 2
+#define D_EIGHTH = 3
+#define D_SIXTEENTH = 4
+
+#declare sdur = 2
+#declare dur$(5,2)
+dur$(D_WHOLE, DNAME) = "whole"
+dur$(D_WHOLE, DCHAR) = "w"
+dur$(D_WHOLE, DKEY)  = "1"
+
+dur$(D_HALF, DNAME) = "half"
+dur$(D_HALF, DCHAR) = "h"
+dur$(D_HALF, DKEY)  = "2"
+
+dur$(D_QUARTER, DNAME) = "quarter"
+dur$(D_QUARTER, DCHAR) = "q"
+dur$(D_QUARTER, DKEY)  = "3"
+
+dur$(D_EIGHTH, DNAME) = "eighth"
+dur$(D_EIGHTH, DCHAR) = "i"
+dur$(D_EIGHTH, DKEY)  = "4"
+
+dur$(D_SIXTEENTH, DNAME) = "sixteenth"
+dur$(D_SIXTEENTH, DCHAR) = "s"
+dur$(D_SIXTEENTH, DKEY)  = "5"
+
+
+.keys
+'----
 #define KEY_UP = "{x91}"
 #define KEY_DOWN = "{x11}"
 #define KEY_LEFT = "{x9D}"
@@ -118,6 +158,7 @@ filt_state_name$(1) = "ON"
 #define KEY_SHIFT_MINUS = "Ý"
 #define KEY_REV_ON = "{x12}"
 #define KEY_REV_OFF = "{x92}"
+#define KEY_TAB = chr$(9)
 
 .init
 '----
@@ -411,13 +452,15 @@ play : play ""
   loop
   return
 
+
+
 .draw_table
 '----------
-  print "{x93}env editor"
-  print " ----------"
+  print "{x93}env editor";KEY_TAB;dur$(sdur, DNAME)
+  print "----------"
   print
-  print "   NAME";chr$(9);chr$(9);"ATTACK";chr$(9);"DECAY";chr$(9);"SUSTAIN";chr$(9);"RELEASE";chr$(9);
-  print "WAVEFRM";chr$(9);"PULSEWIDTH"
+  print "   NAME";KEY_TAB;KEY_TAB;"ATTACK";KEY_TAB;"DECAY";KEY_TAB;"SUSTAIN";KEY_TAB;"RELEASE";KEY_TAB;
+  print "WAVEFRM";KEY_TAB;"PULSEWIDTH"
 
   for row = 0 to 9
     print row;" : ";
@@ -435,28 +478,33 @@ play : play ""
     gosub show_cell
     col = 6 : v = envs_pw(row)
     gosub show_cell
+    print
   next row
 
   print
   print "filter editor"
-  print "-------------"
+  print "-------------";
+  print KEY_TAB;"freq";KEY_TAB;"lp";KEY_TAB;"bp";KEY_TAB;"hp";KEY_TAB;"res"
+  sidgrp = 0 : gosub show_filter
   sidgrp = 1 : gosub show_filter
-  sidgrp = 2 : gosub show_filter
 
   return
 
 
 .show_filter
 '-----------
-  print
-  print "show_filter"
-  print "-----------";chr$(3);"freq";chr$(3);"lp";chr$(3);"bp";chr$(3);"hp";chr$(3);"res"
-  print "SIDS ";filt_name$(sidgrp);": ";chr$(3);
-  print filt_freq(sidgrp);chr$(3);
-  print filt_state_name$(filt_lp(sidgrp));chr$(3);
-  print filt_state_name$(filt_bp(sidgrp));chr$(3);
-  print filt_state_name$(filt_hp(sidgrp));chr$(3);
-  print filt_res(sidgrp)
+  print "SIDS ";filt_name$(sidgrp);": ";KEY_TAB;
+  if fsrow = sidgrp and fscol = 0 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  print filt_freq(sidgrp);KEY_TAB;
+  if fsrow = sidgrp and fscol = 1 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  print filt_state_name$(filt_lp(sidgrp));KEY_TAB;
+  if fsrow = sidgrp and fscol = 2 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  print filt_state_name$(filt_bp(sidgrp));KEY_TAB;
+  if fsrow = sidgrp and fscol = 3 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  print filt_state_name$(filt_hp(sidgrp));KEY_TAB;
+  if fsrow = sidgrp and fscol = 4 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  print filt_res(sidgrp);
+  print KEY_REV_OFF
   return
 
 
@@ -498,13 +546,64 @@ play : play ""
   if a$ = KEY_RIGHT and scol < 6 then scol = scol + 1
   if a$ = KEY_UP and srow > 0 then srow = srow - 1
   if a$ = KEY_DOWN and srow < 9 then srow = srow + 1
-  if a$ = "+" then delta=1 : gosub incr_val
+  if a$ = "+" or a$="=" then delta=1 : gosub incr_val
   if a$ = "-" then delta=1 : gosub decr_val
   if a$ = KEY_SHIFT_PLUS then delta=100 : gosub incr_val
   if a$ = KEY_SHIFT_MINUS then delta=100 : gosub decr_val
   if a$ = chr$(13) and scol = 0 then gosub change_env_name
 
+  if a$ = KEY_TAB then ffocus = 1 : gosub get_user_input_for_filters
+
+  gosub check_duration_change
   gosub check_piano_keys
+  return
+
+.get_user_input_for_filters
+'--------------------------
+  do while 1
+    gosub draw_table
+
+    get key a$
+
+    if a$ = KEY_LEFT and fscol > 0 then fscol = fscol - 1
+    if a$ = KEY_RIGHT and fscol < 4 then fscol = fscol + 1
+    if a$ = KEY_UP and fsrow > 0 then fsrow = fsrow - 1
+    if a$ = KEY_DOWN and fsrow < 1 then fsrow = fsrow + 1
+    if a$ = "+" or a$="=" then delta=1 : gosub incr_fval
+    if a$ = "-" then delta=1 : gosub decr_fval
+    if a$ = KEY_SHIFT_PLUS then delta = 100 : gosub incr_fval
+    if a$ = KEY_SHIFT_MINUS then delta = 100 : gosub decr_fval
+
+    if a$ = KEY_RETURN then begin
+      fsel = mod(fsel + 1, 2)
+      gosub apply_selected_filter
+    bend
+
+    if a$ = KEY_TAB or a$ = KEY_MEGA_Q then exit
+
+    gosub check_duration_change
+    gosub check_piano_keys
+  loop
+  ffocus = 0
+  return
+
+
+.check_duration_change
+'---------------------
+  for k = D_WHOLE to D_SIXTEENTH
+    if a$ = dur$(k, DKEY) then sdur = k
+  next k
+
+  return
+
+
+.apply_selected_filter
+'---------------------
+  filter 1, filt_freq(sidgrp), filt_lp(sidgrp), {x5F} 
+         filt_bp(sidgrp), filt_hp(sidgrp), filt_res(sidgrp)
+  filter 2, filt_freq(sidgrp), filt_lp(sidgrp), {x5F} 
+         filt_bp(sidgrp), filt_hp(sidgrp), filt_res(sidgrp)
+
   return
 
 .change_env_name
@@ -515,13 +614,20 @@ play : play ""
 
 .check_piano_keys
 '----------------
-  pstr$ = ""
+  ' apply filter
+  pstr$ = "x0"
+  if fsel = 1 then pstr$ = "x1"
+
+  ' decide note length
+  pstr$ = pstr$ + dur$(sdur, DCHAR)
+
+  ' which note to play
   for k = 0 to 11
-    if a$ = keys_in$(k) then pstr$ = keys_out$(k)
+    if a$ = keys_in$(k) then pstr$ = pstr$ + keys_out$(k)
   next k
 
   if len(pstr$)>0 then begin
-    play "o5qt"+str$(srow)+pstr$
+    play "o5t"+str$(srow)+pstr$
   bend
 
   return
@@ -538,6 +644,7 @@ play : play ""
   gosub apply_val
   return
 
+
 .decr_val
 '--------
   gosub get_val
@@ -546,6 +653,51 @@ play : play ""
   if v < 0 then v = 0
   gosub apply_val
   return
+
+
+.incr_fval
+'---------
+  if fscol = 0 then begin
+    v = filt_freq(fsrow) + delta
+    if v > 2047 then v = 2047
+    filt_freq(fsrow) = v
+  bend
+
+  if fscol = 1 then filt_lp(fsrow) = 1
+  if fscol = 2 then filt_bp(fsrow) = 1
+  if fscol = 3 then filt_hp(fsrow) = 1
+
+  if fscol = 4 then begin
+    v = filt_res(fsrow) + delta
+    if v > 15 then v = 15
+    filt_res(fsrow) = v
+  bend
+
+  gosub apply_selected_filter
+  return
+
+
+.decr_fval
+'---------
+  if fscol = 0 then begin
+    v = filt_freq(fsrow) - delta
+    if v < 0 then v = 0
+    filt_freq(fsrow) = v
+  bend
+
+  if fscol = 1 then filt_lp(fsrow) = 0
+  if fscol = 2 then filt_bp(fsrow) = 0
+  if fscol = 3 then filt_hp(fsrow) = 0
+
+  if fscol = 4 then begin
+    v = filt_res(fsrow) - delta
+    if v < 0 then v = 0
+    filt_res(fsrow) = v
+  bend
+
+  gosub apply_selected_filter
+  return
+
 
 .apply_val
 '---------
