@@ -120,6 +120,9 @@ filt_state_name$(1) = "ON"
 #declare fpreset = 1
 
 #declare fscol = 0, fsrow = 0, ffocus = 0, fsel = -1
+#declare oct = 5
+
+#declare curr_freq, curr_dir
 
 
 .duration
@@ -477,7 +480,7 @@ play : play ""
 
 .draw_table
 '----------
-  print "{x93}env editor";KEY_TAB;dur$(sdur, DNAME)
+  print "{x93}env editor";KEY_TAB;dur$(sdur, DNAME);KEY_TAB;"octave";oct
   print "----------"
   print
   print "   NAME";KEY_TAB;KEY_TAB;"ATTACK";KEY_TAB;"DECAY";KEY_TAB;"SUSTAIN";KEY_TAB;"RELEASE";KEY_TAB;
@@ -574,7 +577,8 @@ play : play ""
 
 .get_user_input_for_table
 '------------------------
-  get key a$
+  ' get key a$
+  gosub read_key_loop
   if a$ = KEY_LEFT and scol > 0 then scol = scol - 1
   if a$ = KEY_RIGHT and scol < 6 then scol = scol + 1
   if a$ = KEY_UP and srow > 0 then srow = srow - 1
@@ -596,7 +600,8 @@ play : play ""
   do while 1
     gosub draw_table
 
-    get key a$
+    ' get key a$
+    gosub read_key_loop
 
     if a$ = KEY_LEFT and fscol > 0 then fscol = fscol - 1
     if a$ = KEY_RIGHT and fscol < 7 then fscol = fscol + 1
@@ -620,6 +625,16 @@ play : play ""
   ffocus = 0
   return
 
+.read_key_loop
+'-------------
+  a$ = ""
+  do while a$=""
+    get a$
+    if fsel <> -1 then begin
+      gosub update_selected_filter
+    bend
+  loop
+  return
 
 .check_duration_change
 '---------------------
@@ -627,11 +642,69 @@ play : play ""
     if a$ = dur$(k, DKEY) then sdur = k
   next k
 
+  ' check octave too
+  if a$ = ">" and oct < 6 then oct = oct + 1
+  if a$ = "<" and oct > 0 then oct = oct - 1
+
+  return
+
+
+.update_selected_filter
+'----------------------
+  if fsel = -1 then return
+  if curr_dir = DIR_NONE then return
+
+  print "{x13}";chr$(27);"qcurr_freq=";curr_freq;
+  
+  poke $d415, curr_freq and 3
+  poke $d416, curr_freq >> 3
+  setbit $d418, 4
+
+  poke $d435, curr_freq and 3
+  poke $d436, curr_freq >> 3
+  setbit $d438, 4
+
+  'filter 1, curr_freq, filt_lp(fsel), {x5F} 
+  '       filt_bp(fsel), filt_hp(fsel), filt_res(fsel)
+  'filter 2, curr_freq, filt_lp(fsel), {x5F} 
+  '       filt_bp(fsel), filt_hp(fsel), filt_res(fsel)
+
+  if curr_dir = DIR_UP then begin
+    curr_freq = curr_freq + filt_sweep(fsel)
+    if curr_freq > filt_freq(fsel) then begin
+      curr_freq = filt_freq(fsel)
+      if filt_dir(fsel) = DIR_OSC then curr_dir = DIR_DOWN
+      if filt_dir(fsel) = DIR_UP then curr_freq = filt_min(fsel)
+    bend
+    return
+  bend
+
+  if curr_dir = DIR_DOWN then begin
+    curr_freq = curr_freq - filt_sweep(fsel)
+    if curr_freq < filt_min(fsel) then begin
+      curr_freq = filt_min(fsel)
+      if filt_dir(fsel) = DIR_OSC then curr_dir = DIR_UP
+      if filt_dir(fsel) = DIR_DOWN then curr_freq = filt_freq(fsel)
+    bend
+    return
+  bend
+
   return
 
 
 .apply_selected_filter
 '---------------------
+  curr_freq = filt_freq(fsrow)
+  curr_dir = DIR_NONE
+  if   filt_dir(fsrow) = DIR_UP {x5F}
+    or filt_dir(fsrow) = DIR_OSC then begin
+    curr_freq = filt_min(fsrow)
+    curr_dir = DIR_UP
+  bend
+  if filt_dir(fsrow) = DIR_DOWN then begin
+    curr_dir = DIR_DOWN
+  bend
+
   filter 1, filt_freq(fsrow), filt_lp(fsrow), {x5F} 
          filt_bp(fsrow), filt_hp(fsrow), filt_res(fsrow)
   filter 2, filt_freq(fsrow), filt_lp(fsrow), {x5F} 
@@ -654,13 +727,16 @@ play : play ""
   ' decide note length
   pstr$ = pstr$ + dur$(sdur, DCHAR)
 
+  ' decide octave
+  pstr$ = pstr$ + "o" + str$(oct)
+
   ' which note to play
   for k = 0 to 11
     if a$ = keys_in$(k) then pstr$ = pstr$ + keys_out$(k)
   next k
 
   if len(pstr$)>0 then begin
-    play "o5t"+str$(srow)+pstr$
+    play "t"+str$(srow)+pstr$
   bend
 
   return
