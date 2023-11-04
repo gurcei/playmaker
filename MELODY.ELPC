@@ -20,6 +20,7 @@
 '          F3 = Save
 '          F7 = Envelope editor
 '          F8 = Filter editor
+'   F9/CTRL-P = Chunk sequencer
 
 trap runstop_trapper
 
@@ -341,6 +342,8 @@ play : play ""
     print #2, envs_pw(row)
   next row
 
+  ' save filter presets
+  ' -------------------
   dclose #2
 
   chunk_idx = 0
@@ -515,24 +518,25 @@ play : play ""
 
 .show_filter
 '-----------
-  if fsel = fpreset then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_name$(fpreset);": ";KEY_TAB;
+  if fsel = fpreset then print ">";:else print " ";
   if fsrow = fpreset and fscol = 0 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_freq(fpreset);KEY_TAB;
+  print filt_name$(fpreset);": ";KEY_TAB;
   if fsrow = fpreset and fscol = 1 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_state_name$(filt_lp(fpreset));KEY_TAB;
+  print filt_freq(fpreset);KEY_TAB;
   if fsrow = fpreset and fscol = 2 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_state_name$(filt_bp(fpreset));KEY_TAB;
+  print filt_state_name$(filt_lp(fpreset));KEY_TAB;
   if fsrow = fpreset and fscol = 3 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_state_name$(filt_hp(fpreset));KEY_TAB;
+  print filt_state_name$(filt_bp(fpreset));KEY_TAB;
   if fsrow = fpreset and fscol = 4 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  print filt_state_name$(filt_hp(fpreset));KEY_TAB;
+  if fsrow = fpreset and fscol = 5 then print KEY_REV_ON;:else print KEY_REV_OFF;
   print filt_res(fpreset);KEY_TAB;
 
-  if fsrow = fpreset and fscol = 5 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_dir(fpreset);KEY_TAB;
   if fsrow = fpreset and fscol = 6 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_min(fpreset);KEY_TAB;
+  print filt_dir(fpreset);KEY_TAB;
   if fsrow = fpreset and fscol = 7 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  print filt_min(fpreset);KEY_TAB;
+  if fsrow = fpreset and fscol = 8 then print KEY_REV_ON;:else print KEY_REV_OFF;
   print filt_sweep(fpreset);
 
   print KEY_REV_OFF
@@ -582,7 +586,7 @@ play : play ""
   if a$ = "-" then delta=1 : gosub decr_val
   if a$ = KEY_SHIFT_PLUS then delta=100 : gosub incr_val
   if a$ = KEY_SHIFT_MINUS then delta=100 : gosub decr_val
-  if a$ = chr$(13) and scol = 0 then gosub change_env_name
+  if a$ = KEY_RETURN and scol = 0 then gosub change_env_name
 
   if a$ = KEY_TAB then ffocus = 1 : gosub get_user_input_for_filters
 
@@ -599,7 +603,7 @@ play : play ""
     gosub read_key_loop
 
     if a$ = KEY_LEFT and fscol > 0 then fscol = fscol - 1
-    if a$ = KEY_RIGHT and fscol < 7 then fscol = fscol + 1
+    if a$ = KEY_RIGHT and fscol < 8 then fscol = fscol + 1
     if a$ = KEY_UP and fsrow > 0 then fsrow = fsrow - 1
     if a$ = KEY_DOWN and fsrow < 10 then fsrow = fsrow + 1
     if a$ = "+" or a$="=" then delta=1 : gosub incr_fval
@@ -607,10 +611,12 @@ play : play ""
     if a$ = KEY_SHIFT_PLUS then delta = 100 : gosub incr_fval
     if a$ = KEY_SHIFT_MINUS then delta = 100 : gosub decr_fval
 
-    if a$ = KEY_RETURN then begin
+    if a$ = " " then begin
       if fsel = fsrow then fsel = -1:else fsel = fsrow
       gosub apply_selected_filter
     bend
+
+    if a$ = KEY_RETURN then gosub edit_filter_field
 
     if a$ = KEY_TAB or a$ = KEY_MEGA_Q then exit
 
@@ -649,7 +655,7 @@ play : play ""
   if fsel = -1 then return
   if curr_dir = DIR_NONE then return
 
-  print "{x13}";KEY_TAB;KEY_TAB;KEY_TAB;KEY_TAB;chr$(27);"qcurr_freq=";curr_freq;
+  print "{x13}";KEY_TAB;KEY_TAB;KEY_TAB;KEY_TAB;KEY_TAB;chr$(27);"qcurr_freq=";curr_freq;
   
   ' NOTE: Can't use SETBIT for SID registers as the regs are write-only
   '       (SETBIT will internally need a read prior to the write)
@@ -704,9 +710,53 @@ play : play ""
 
 .change_env_name
 '---------------
+  v$=""
   input "new name: ",v$
   if v$<>"" then envs_name$(srow) = v$
   return
+
+
+.edit_filter_field
+'-----------------
+  if fscol = 2 then v=filt_lp(fsrow):v=mod(v+1,2):filt_lp(fsrow)=v:return
+  if fscol = 3 then v=filt_bp(fsrow):v=mod(v+1,2):filt_bp(fsrow)=v:return
+  if fscol = 4 then v=filt_hp(fsrow):v=mod(v+1,2):filt_hp(fsrow)=v:return
+
+  v$=""
+  input "new value: ",v$
+  if v$<>"" then begin
+    if fscol = 0 then filt_name$(fsrow) = v$
+    if fscol = 1 then begin
+      v = val(v$)
+      if v > 2047 then v = 2047
+      if v < 0 then v = 0
+      filt_freq(fsrow) = v
+    bend
+    if fscol = 5 then begin
+      v = val(v$)
+      if v > 15 then v = 15
+      if v < 0 then v = 0
+      filt_res(fsrow) = v
+    bend
+    if fscol = 6 then begin
+      v = val(v$)
+      if v > 3 then v = 3
+      if v < 0 then v = 0
+      filt_dir(fsrow) = v
+    bend
+    if fscol = 7 then begin
+      v = val(v$)
+      if v > 2047 then v = 2047
+      if v < 0 then v = 0
+      filt_min(fsrow) = v
+    bend
+    if fscol = 8 then begin
+      v = val(v$)
+      if v > 2047 then v = 2047
+      if v < 0 then v = 0
+      filt_sweep(fsrow) = v
+    bend
+  bend
 
 .check_piano_keys
 '----------------
@@ -756,31 +806,31 @@ play : play ""
 
 .incr_fval
 '---------
-  if fscol = 0 then begin
+  if fscol = 1 then begin
     v = filt_freq(fsrow) + delta
     if v > 2047 then v = 2047
     filt_freq(fsrow) = v
   bend
 
-  if fscol = 1 then filt_lp(fsrow) = 1
-  if fscol = 2 then filt_bp(fsrow) = 1
-  if fscol = 3 then filt_hp(fsrow) = 1
+  if fscol = 2 then filt_lp(fsrow) = 1
+  if fscol = 3 then filt_bp(fsrow) = 1
+  if fscol = 4 then filt_hp(fsrow) = 1
 
-  if fscol = 4 then begin
+  if fscol = 5 then begin
     v = filt_res(fsrow) + delta
     if v > 15 then v = 15
     filt_res(fsrow) = v
   bend
 
-  if fscol=5 and filt_dir(fsrow) < 3 then filt_dir(fsrow) = filt_dir(fsrow) + 1
+  if fscol=6 and filt_dir(fsrow) < 3 then filt_dir(fsrow) = filt_dir(fsrow) + 1
 
-  if fscol=6 and filt_min(fsrow) < 2047 then begin
+  if fscol=7 and filt_min(fsrow) < 2047 then begin
     v = filt_min(fsrow) + delta
     if v > 2047 then v = 2047
     filt_min(fsrow) = v
   bend
     
-  if fscol=7 and filt_sweep(fsrow) < 2047 then begin
+  if fscol=8 and filt_sweep(fsrow) < 2047 then begin
     v = filt_sweep(fsrow) + delta
     if v > 2047 then v = 2047
     filt_sweep(fsrow) = v
@@ -792,31 +842,31 @@ play : play ""
 
 .decr_fval
 '---------
-  if fscol = 0 then begin
+  if fscol = 1 then begin
     v = filt_freq(fsrow) - delta
     if v < 0 then v = 0
     filt_freq(fsrow) = v
   bend
 
-  if fscol = 1 then filt_lp(fsrow) = 0
-  if fscol = 2 then filt_bp(fsrow) = 0
-  if fscol = 3 then filt_hp(fsrow) = 0
+  if fscol = 2 then filt_lp(fsrow) = 0
+  if fscol = 3 then filt_bp(fsrow) = 0
+  if fscol = 4 then filt_hp(fsrow) = 0
 
-  if fscol = 4 then begin
+  if fscol = 5 then begin
     v = filt_res(fsrow) - delta
     if v < 0 then v = 0
     filt_res(fsrow) = v
   bend
 
-  if fscol=5 and filt_dir(fsrow) > 0 then filt_dir(fsrow) = filt_dir(fsrow) - 1
+  if fscol=6 and filt_dir(fsrow) > 0 then filt_dir(fsrow) = filt_dir(fsrow) - 1
 
-  if fscol=6 and filt_min(fsrow) > 0 then begin
+  if fscol=7 and filt_min(fsrow) > 0 then begin
     v = filt_min(fsrow) - delta
     if v < 0 then v = 0
     filt_min(fsrow) = v
   bend
 
-  if fscol=7 and filt_sweep(fsrow) > 0 then begin
+  if fscol=8 and filt_sweep(fsrow) > 0 then begin
     v = filt_sweep(fsrow) - delta
     if v < 0 then v = 0
     filt_sweep(fsrow) = v
