@@ -86,6 +86,10 @@ FILTTYPE filt(10) = [ {x5F}
 {x5F}
 ]
 
+#declare seq_chunk(50), seq_filter(50)
+
+#declare seqcnt, seqptr
+
 #declare row, col, srow, scol, a$, v, maxv, v$
 
 #struct KEY_TYPE in$, out$
@@ -176,6 +180,7 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 #define KEY_F4 = "{x8A}"
 #define KEY_F7 = "{x88}"
 #define KEY_F8 = "{x8C}"
+#define KEY_F9 = chr$(16)
 #define KEY_RETURN = chr$(13)
 #define KEY_ESCAPE = chr$(27)
 #define KEY_SHIFT_RETURN = chr$(141)
@@ -468,6 +473,7 @@ play : play ""
   if key$ = KEY_F1 then gosub load
   if key$ = KEY_F3 then gosub save
   if key$ = KEY_F7 then gosub envelope_editor
+  if key$ = KEY_F9 then gosub chunk_sequencer
 
   ' F4 = save as text
   if key$ = KEY_F4 then gosub save_as_text
@@ -928,4 +934,87 @@ play : play ""
   print " in line";el
   key on
   end
+
+.chunk_sequencer
+'---------------
+  do while 1
+    gosub draw_sequence
+    gosub get_user_input_for_sequence
+
+    if a$ = KEY_MEGA_Q then exit
+  loop
+  return
+
+
+.draw_sequence
+'-------------
+  print "{x93}sequence editor"
+  print "---------------"
+  print "A)dd E)dit D)elete   - seqcnt = ";seqcnt
+  print
+
+  k = 0
+  do while k < seqcnt
+    if seqptr = k then print KEY_REV_ON;:else print KEY_REV_OFF;
+
+    print seq_chunk(k);
+    if seq_filter(k) = -1 then print "<none>":else begin
+      print KEY_TAB;filt_name$(seq_filter(k))
+    bend
+
+    k = k + 1
+  loop
+  
+  return
+
+
+.get_user_input_for_sequence
+'---------------------------
+  gosub read_key_loop
+
+  if a$="a" then gosub add_chunk_to_seq
+  if a$="e" then gosub edit_chunk_seq
+  if a$="d" then gosub delete_chunk_seq
+
+  if a$=KEY_UP and seqptr > 0 then seqptr = seqptr - 1
+  if a$=KEY_DOWN and seqptr < seqcnt-1 then seqptr = seqptr + 1 
+  return
+
+.delete_chunk_seq
+'----------------
+  if seqcnt = 0 then return
+
+  k = 0
+  do while k < seqcnt - 1
+    seq_chunk(k) = seq_chunk(k + 1)
+    seq_filter(k) = seq_filter(k + 1)
+    k = k + 1
+  loop
+
+  seqcnt = seqcnt - 1
+  return
+
+.edit_chunk_seq
+'--------------
+  if seqcnt = 0 then return
+  v=0:input "chunk#: ", v
+  seq_chunk(seqptr) = v
+  v=-1:input "filter#: ", v
+  seq_filter(seqptr) = v
+  return
+
+.add_chunk_to_seq
+'----------------
+  seqcnt = seqcnt + 1
+
+  ' move all higher chunk sequences up one
+  k = seqcnt - 2
+  do while k >= seqptr
+    seq_chunk(k+1) = seq_chunk(k)
+    seq_filter(k+1) = seq_filter(k)
+    k = k - 1
+  loop
+
+  gosub edit_chunk_seq
+  return
 ÿ
