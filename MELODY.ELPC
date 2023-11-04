@@ -308,6 +308,19 @@ play : play ""
   next row
   print
 
+  ' load filter presets
+  ' -------------------
+  for row = 0 to 10
+    input #2, filt_name$(row)
+    input #2, filt_freq(row)
+    input #2, filt_lp(row)
+    input #2, filt_bp(row)
+    input #2, filt_hp(row)
+    input #2, filt_res(row)
+    input #2, filt_min(row)
+    input #2, filt_sweep(row)
+  next row
+
   dclose #2
 
   chunk_idx = 0
@@ -344,6 +357,17 @@ play : play ""
 
   ' save filter presets
   ' -------------------
+  for row = 0 to 10
+    print #2, filt_name$(row)
+    print #2, filt_freq(row)
+    print #2, filt_lp(row)
+    print #2, filt_bp(row)
+    print #2, filt_hp(row)
+    print #2, filt_res(row)
+    print #2, filt_min(row)
+    print #2, filt_sweep(row)
+  next row
+
   dclose #2
 
   chunk_idx = 0
