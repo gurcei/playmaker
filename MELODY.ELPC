@@ -202,6 +202,7 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 #define KEY_DOWN = "{x11}"
 #define KEY_LEFT = "{x9D}"
 #define KEY_RIGHT = "{x1D}"
+#define KEY_SPACE = " "
 #define KEY_DEL = "{x14}"
 #define KEY_CTRL_W = "{x17}"
 #define KEY_CTRL_U = "{x15}"
@@ -1117,28 +1118,37 @@ play : play ""
   loop
   return
 
+#declare sscol, s
 
 .draw_sequence
 '-------------
   print "{x93}sequence editor"
   print "---------------"
   print "A)dd I)nsert E)dit D)elete   - seqcnt = ";seqcnt
-  print " Cmd     Extra"
-  print " ---     -----"
+  print " Cmd            Extra"         
+  print " ---            -----"
 
 
   k = 0
   do while k < seqcnt
     if plyptr = k then print ">";:else print " ";
 
-    if seqptr = k then print KEY_REV_ON;:else print KEY_REV_OFF;
+    s=0:gosub highlight_selected_seq_column
 
+    ' chunk is a special CMD_*?
     if seq_chunk(k) < 0 and abs(seq_chunk(k)) < CMD_MAX then begin
-      print seq_cmdname$(abs(seq_chunk(k)));
+      v$ = seq_cmdname$(abs(seq_chunk(k)))
+      s = 10-len(v$)
+      print v$;
+      do while s >= 0
+        print " ";
+        s = s - 1
+      loop
     bend:else begin
-      print seq_chunk(k);
+      print seq_chunk(k);KEY_TAB;
     bend
 
+    s=1:gosub highlight_selected_seq_column
     handled = 0
     if seq_chunk(k) = CMD_FILTER then begin
       handled = 1
@@ -1161,6 +1171,10 @@ play : play ""
   
   return
 
+.highlight_selected_seq_column
+'-----------------------------
+  if seqptr = k and sscol=s then print KEY_REV_ON;:else print KEY_REV_OFF;
+  return
 
 .get_user_input_for_sequence
 '---------------------------
@@ -1173,9 +1187,12 @@ play : play ""
 
   if a$=KEY_UP and seqptr > 0 then seqptr = seqptr - 1
   if a$=KEY_DOWN and seqptr < seqcnt-1 then seqptr = seqptr + 1 
+  if a$=KEY_LEFT and sscol > 0 then sscol = sscol - 1
+  if a$=KEY_RIGHT and sscol < 1 then sscol = sscol + 1
 
   if a$=KEY_SHIFT_RETURN then plyptr = 0 : plyflag = 1 : chunk_rpt = 0
-  if a$=KEY_RETURN then plyptr = seqptr : plyflag = 1 : chunk_rpt = 0
+  if a$=KEY_SPACE then plyptr = seqptr : plyflag = 1 : chunk_rpt = 0
+  if a$=KEY_RETURN then gosub edit_chunk_cell
   if a$=KEY_ESCAPE then plyptr = -1 : plyflag = 0
   return
 
@@ -1208,6 +1225,29 @@ play : play ""
   seq_extra(seqptr) = v
   return
 
+.edit_chunk_cell
+'---------------
+  if seqcnt = 0 then return
+
+  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
+
+  if sscol = 0 then begin
+    v = seq_chunk(seqptr)
+    print "chunk#: ";KEY_ESCAPE;"^";v;KEY_ESCAPE;"{x5F}";
+    input "", v
+    seq_chunk(seqptr) = v
+  bend
+
+  if sscol = 1 then begin
+    v = seq_extra(seqptr)
+    print "extra#: ";KEY_ESCAPE;"^";v;KEY_ESCAPE;"{x5F}";
+    input "", v
+    seq_extra(seqptr) = v
+  bend
+
+  return
+
+
 .insert_chunk_to_seq
 '-------------------
   seqcnt = seqcnt + 1
@@ -1220,13 +1260,16 @@ play : play ""
     k = k - 1
   loop
 
-  gosub edit_chunk_seq
+  seq_chunk(seqptr) = 0
+  seq_extra(seqptr) = 0
+
   return
 
 .add_chunk_to_seq
 '----------------
- seqptr = seqcnt
- seqcnt = seqcnt + 1
- gosub edit_chunk_seq
- return
+  seqptr = seqcnt
+  seqcnt = seqcnt + 1
+  seq_chunk(seqptr) = 0
+  seq_extra(seqptr) = 0
+  return
 ÿ
