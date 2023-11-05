@@ -93,7 +93,7 @@ FILTTYPE filt(10) = [ {x5F}
 ]
 
 #declare seq_chunk(100), seq_extra(100)
-#declare echo_m, echo_b, echo_sz = .05
+#declare echo_m, echo_b, echo_sz = .05, chunk_rpt
 #declare v1$, v2$, v3$, v4$, v5$, v6$
 
 .cmds
@@ -789,8 +789,10 @@ play : play ""
 .parse_current_seqptr
 '--------------------
   k = seq_chunk(plyptr)
+  
   if k >= 0 then begin
     chunk_idx = k
+    if chunk_rpt <= 0 then chunk_rpt = seq_extra(plyptr)
     gosub play_chunk_idx
     sleep .1
     gosub draw_sequence
@@ -811,7 +813,9 @@ play : play ""
   if k = CMD_ECHO_OFF then echo_m = 0 : echo_b = 0
   if k = CMD_ECHO_SZ then echo_sz = seq_extra(plyptr)
 
-  plyptr = plyptr + 1
+  if chunk_rpt > 0 then chunk_rpt = chunk_rpt - 1
+
+  if chunk_rpt <= 0 then plyptr = plyptr + 1
 
   if k = CMD_LOOP then plyptr = 0
 
@@ -1170,8 +1174,8 @@ play : play ""
   if a$=KEY_UP and seqptr > 0 then seqptr = seqptr - 1
   if a$=KEY_DOWN and seqptr < seqcnt-1 then seqptr = seqptr + 1 
 
-  if a$=KEY_RETURN then plyptr = 0 : plyflag = 1
-  if a$=KEY_SHIFT_RETURN then plyptr = seqptr : plyflag = 1
+  if a$=KEY_SHIFT_RETURN then plyptr = 0 : plyflag = 1 : chunk_rpt = 0
+  if a$=KEY_RETURN then plyptr = seqptr : plyflag = 1 : chunk_rpt = 0
   if a$=KEY_ESCAPE then plyptr = -1 : plyflag = 0
   return
 
