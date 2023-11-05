@@ -63,6 +63,12 @@ ENVTYPE envs(9) = [ {x5F}
 #define DIR_DOWN = 2
 #define DIR_OSC  = 3
 
+#declare dir_name$(3)
+dir_name$(0) = "NONE"
+dir_name$(1) = "UP"
+dir_name$(2) = "DOWN"
+dir_name$(3) = "OSC"
+
 #define F_OFF = 0
 #define F_ON  = 1
 
@@ -86,7 +92,18 @@ FILTTYPE filt(10) = [ {x5F}
 {x5F}
 ]
 
-#declare seq_chunk(50), seq_filter(50)
+#declare seq_chunk(100), seq_extra(100)
+
+#define CMD_TEMPO = -1
+#define CMD_FILTER = -2
+#define CMD_LOOP = -3
+#define CMD_MAX = 4
+
+#declare seq_cmdname$(5)
+seq_cmdname$(1) = "TEMPO"
+seq_cmdname$(2) = "FILTER"
+seq_cmdname$(3) = "LOOP"
+
 
 #declare seqcnt, seqptr
 
@@ -128,7 +145,8 @@ filt_state_name$(1) = "ON"
 #declare oct = 5
 
 #declare curr_freq, curr_dir
-
+#declare handled
+#declare plyptr = -1, plyflag
 
 .duration
 '--------
@@ -484,14 +502,19 @@ play : play ""
   ' shift+return=play all channels
   if key$ = KEY_SHIFT_RETURN then begin
     tempo tmpo%
-    play v$(0,chunk_idx), v$(1,chunk_idx), {x5F}
-    v$(2,chunk_idx), v$(3,chunk_idx), v$(4,chunk_idx), {x5F}
-    v$(5,chunk_idx)
+    gosub play_chunk_idx
   bend
 
   gosub check_valid_key
   return
 
+.play_chunk_idx
+'--------------
+  play v$(0,chunk_idx), v$(1,chunk_idx), {x5F}
+  v$(2,chunk_idx), v$(3,chunk_idx), v$(4,chunk_idx), {x5F}
+  v$(5,chunk_idx)
+  
+  return
 
 .envelope_editor
 '---------------
@@ -515,7 +538,8 @@ play : play ""
   print "WAVEFRM";KEY_TAB;"PULSEWIDTH"
 
   for row = 0 to 9
-    print row;" : ";
+    if srow = row then print ">";:else print " ";
+    print row;": ";
     col = 0 : v$ = envs_name$(row)
     gosub show_cell
     col = 1 : v = envs_attack(row)
@@ -549,27 +573,41 @@ play : play ""
 .show_filter
 '-----------
   if fsel = fpreset then print ">";:else print " ";
-  if fsrow = fpreset and fscol = 0 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_name$(fpreset);": ";KEY_TAB;
-  if fsrow = fpreset and fscol = 1 then print KEY_REV_ON;:else print KEY_REV_OFF;
+
+  k = 0 : gosub check_show_filter_highlight
+  print filt_name$(fpreset);"  ";KEY_TAB;
+
+  k = 1 : gosub check_show_filter_highlight
   print filt_freq(fpreset);KEY_TAB;
-  if fsrow = fpreset and fscol = 2 then print KEY_REV_ON;:else print KEY_REV_OFF;
+
+  k = 2 : gosub check_show_filter_highlight
   print filt_state_name$(filt_lp(fpreset));KEY_TAB;
-  if fsrow = fpreset and fscol = 3 then print KEY_REV_ON;:else print KEY_REV_OFF;
+
+  k = 3 : gosub check_show_filter_highlight
   print filt_state_name$(filt_bp(fpreset));KEY_TAB;
-  if fsrow = fpreset and fscol = 4 then print KEY_REV_ON;:else print KEY_REV_OFF;
+
+  k = 4 : gosub check_show_filter_highlight
   print filt_state_name$(filt_hp(fpreset));KEY_TAB;
-  if fsrow = fpreset and fscol = 5 then print KEY_REV_ON;:else print KEY_REV_OFF;
+
+  k = 5 : gosub check_show_filter_highlight
   print filt_res(fpreset);KEY_TAB;
 
-  if fsrow = fpreset and fscol = 6 then print KEY_REV_ON;:else print KEY_REV_OFF;
-  print filt_dir(fpreset);KEY_TAB;
-  if fsrow = fpreset and fscol = 7 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  k = 6 : gosub check_show_filter_highlight
+  print dir_name$(filt_dir(fpreset));KEY_TAB;
+
+  k = 7 : gosub check_show_filter_highlight
   print filt_min(fpreset);KEY_TAB;
-  if fsrow = fpreset and fscol = 8 then print KEY_REV_ON;:else print KEY_REV_OFF;
+
+  k = 8 : gosub check_show_filter_highlight
   print filt_sweep(fpreset);
 
   print KEY_REV_OFF
+  return
+
+.check_show_filter_highlight
+'---------------------------
+  if fsrow = fpreset and ffocus = 1 and fscol = k then {x5F}
+    print KEY_REV_ON; : else print KEY_REV_OFF;
   return
 
 
@@ -587,20 +625,20 @@ play : play ""
 
 .show_cell
 '---------
-  if srow=row and scol = col then print "{x12}";:else print "{x92}";
+  if srow=row and scol = col and ffocus=0 then print KEY_REV_ON;:else print KEY_REV_OFF;
 
   if col = 0 then begin
-    print v$;chr$(9);"{x92}";
+    print v$;KEY_TAB;"{x92}";
     return
   bend
 
   if col = 5 then begin
-    print wname$(v);chr$(9);"{x92}";
+    print wname$(v);KEY_TAB;KEY_REV_OFF;
     return
   bend
 
   ' else
-  print v;chr$(9);"{x92}";
+  print v;KEY_TAB;KEY_REV_OFF;
   return
 
 
@@ -616,7 +654,8 @@ play : play ""
   if a$ = "-" then delta=1 : gosub decr_val
   if a$ = KEY_SHIFT_PLUS then delta=100 : gosub incr_val
   if a$ = KEY_SHIFT_MINUS then delta=100 : gosub decr_val
-  if a$ = KEY_RETURN and scol = 0 then gosub change_env_name
+  if a$ = KEY_RETURN then a$ = "+" : gosub edit_env_field
+  if a$ = KEY_SHIFT_RETURN then a$ = "-" : gosub edit_env_field
 
   if a$ = KEY_TAB then ffocus = 1 : gosub get_user_input_for_filters
 
@@ -646,7 +685,7 @@ play : play ""
       gosub apply_selected_filter
     bend
 
-    if a$ = KEY_RETURN then gosub edit_filter_field
+    if a$ = KEY_RETURN then gosub edit_filter_field:gosub apply_selected_filter
 
     if a$ = KEY_TAB or a$ = KEY_MEGA_Q then exit
 
@@ -664,7 +703,33 @@ play : play ""
     if fsel <> -1 then begin
       gosub update_selected_filter
     bend
+    if plyflag = 1 then begin
+      if rplay(1) = 0 then gosub parse_current_seqptr
+    bend
   loop
+  return
+
+.parse_current_seqptr
+'--------------------
+  k = seq_chunk(plyptr)
+  if k >= 0 then begin
+    chunk_idx = k
+    gosub play_chunk_idx
+    sleep .1
+    gosub draw_sequence
+  bend
+  if k = CMD_TEMPO then begin
+    k = seq_extra(plyptr)
+    tempo (k)
+  bend
+  if k = CMD_FILTER then begin
+    k = seq_extra(plyptr)
+    fsrow = k
+    gosub apply_selected_filter
+  bend
+
+  plyptr = plyptr + 1
+  if plyptr >= seqcnt then plyflag = 0 : plyptr = -1
   return
 
 .check_duration_change
@@ -745,12 +810,29 @@ play : play ""
   if v$<>"" then envs_name$(srow) = v$
   return
 
+.edit_env_field
+'--------------
+  if scol = 0 then gosub change_env_name : return
+  if scol = 6 then begin
+    v$=""
+    input "new value: ",v$
+    v = val(v$)
+    if v > 4095 then v = 4095
+    if v < 0 then v = 0
+    envs_pw(srow) = v
+    return
+  bend
+
+  if a$="+" then delta=1 : gosub incr_val
+  if a$="-" then delta=1 : gosub decr_val
+  return
 
 .edit_filter_field
 '-----------------
   if fscol = 2 then v=filt_lp(fsrow):v=mod(v+1,2):filt_lp(fsrow)=v:return
   if fscol = 3 then v=filt_bp(fsrow):v=mod(v+1,2):filt_bp(fsrow)=v:return
   if fscol = 4 then v=filt_hp(fsrow):v=mod(v+1,2):filt_hp(fsrow)=v:return
+  if fscol = 6 then v=filt_dir(fsrow):v=mod(v+1,4):filt_dir(fsrow)=v:return
 
   v$=""
   input "new value: ",v$
@@ -950,18 +1032,40 @@ play : play ""
 '-------------
   print "{x93}sequence editor"
   print "---------------"
-  print "A)dd E)dit D)elete   - seqcnt = ";seqcnt
-  print
+  print "A)dd I)nsert E)dit D)elete   - seqcnt = ";seqcnt
+  print " Cmd     Extra"
+  print " ---     -----"
+
 
   k = 0
   do while k < seqcnt
+    if plyptr = k then print ">";:else print " ";
+
     if seqptr = k then print KEY_REV_ON;:else print KEY_REV_OFF;
 
-    print seq_chunk(k);
-    if seq_filter(k) = -1 then print "<none>":else begin
-      print KEY_TAB;filt_name$(seq_filter(k))
+    if seq_chunk(k) < 0 and abs(seq_chunk(k)) < CMD_MAX then begin
+      print seq_cmdname$(abs(seq_chunk(k)));
+    bend:else begin
+      print seq_chunk(k);
     bend
 
+    handled = 0
+    if seq_chunk(k) = CMD_FILTER then begin
+      handled = 1
+      if seq_extra(k) = -1 then print KEY_TAB;"<none>":else begin
+        print KEY_TAB;filt_name$(seq_extra(k))
+      bend
+    bend
+    if handled=0 and seq_chunk(k) = CMD_TEMPO then begin
+      handled = 1
+      print KEY_TAB;seq_extra(k)
+    bend
+    ' ELSE
+    if handled = 0 then begin 
+      print KEY_TAB;seq_extra(k)
+    bend
+
+    print KEY_REV_OFF;
     k = k + 1
   loop
   
@@ -973,11 +1077,16 @@ play : play ""
   gosub read_key_loop
 
   if a$="a" then gosub add_chunk_to_seq
+  if a$="i" then gosub insert_chunk_to_seq
   if a$="e" then gosub edit_chunk_seq
   if a$="d" then gosub delete_chunk_seq
 
   if a$=KEY_UP and seqptr > 0 then seqptr = seqptr - 1
   if a$=KEY_DOWN and seqptr < seqcnt-1 then seqptr = seqptr + 1 
+
+  if a$=KEY_RETURN then plyptr = 0 : plyflag = 1
+  if a$=KEY_SHIFT_RETURN then plyptr = seqptr : plyflag = 1
+  if a$=KEY_ESCAPE then plyptr = -1 : plyflag = 0
   return
 
 .delete_chunk_seq
@@ -987,11 +1096,13 @@ play : play ""
   k = 0
   do while k < seqcnt - 1
     seq_chunk(k) = seq_chunk(k + 1)
-    seq_filter(k) = seq_filter(k + 1)
+    seq_extra(k) = seq_extra(k + 1)
     k = k + 1
   loop
 
   seqcnt = seqcnt - 1
+
+  if seqptr = seqcnt and seqptr>0 then seqptr = seqptr - 1
   return
 
 .edit_chunk_seq
@@ -999,22 +1110,29 @@ play : play ""
   if seqcnt = 0 then return
   v=0:input "chunk#: ", v
   seq_chunk(seqptr) = v
-  v=-1:input "filter#: ", v
-  seq_filter(seqptr) = v
+  v=-1:input "extra#: ", v
+  seq_extra(seqptr) = v
   return
 
-.add_chunk_to_seq
-'----------------
+.insert_chunk_to_seq
+'-------------------
   seqcnt = seqcnt + 1
 
   ' move all higher chunk sequences up one
   k = seqcnt - 2
   do while k >= seqptr
     seq_chunk(k+1) = seq_chunk(k)
-    seq_filter(k+1) = seq_filter(k)
+    seq_extra(k+1) = seq_extra(k)
     k = k - 1
   loop
 
   gosub edit_chunk_seq
   return
+
+.add_chunk_to_seq
+'----------------
+ seqptr = seqcnt
+ seqcnt = seqcnt + 1
+ gosub edit_chunk_seq
+ return
 ÿ
