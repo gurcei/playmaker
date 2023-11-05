@@ -93,16 +93,29 @@ FILTTYPE filt(10) = [ {x5F}
 ]
 
 #declare seq_chunk(100), seq_extra(100)
+#declare echo_m, echo_b, echo_sz = .05
+#declare v1$, v2$, v3$, v4$, v5$, v6$
 
+.cmds
 #define CMD_TEMPO = -1
 #define CMD_FILTER = -2
 #define CMD_LOOP = -3
-#define CMD_MAX = 4
+#define CMD_ECHO_M1 = -4   ' echo melody: voice 1 on voice 4
+#define CMD_ECHO_M2 = -5   ' echo melody: voice 1 on voice 2 + 4 + 5
+#define CMD_ECHO_B  = -6   ' echo bass:   voice 3 on voice 6
+#define CMD_ECHO_OFF = -7
+#define CMD_ECHO_SZ = -8
+#define CMD_MAX = 9
 
-#declare seq_cmdname$(5)
+#declare seq_cmdname$(10)
 seq_cmdname$(1) = "TEMPO"
 seq_cmdname$(2) = "FILTER"
 seq_cmdname$(3) = "LOOP"
+seq_cmdname$(4) = "ECHO_M1"
+seq_cmdname$(5) = "ECHO_M2"
+seq_cmdname$(6) = "ECHO_B"
+seq_cmdname$(7) = "ECHO_OFF"
+seq_cmdname$(8) = "ECHO_SZ"
 
 
 #declare seqcnt, seqptr
@@ -207,6 +220,8 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 #define KEY_REV_ON = "{x12}"
 #define KEY_REV_OFF = "{x92}"
 #define KEY_TAB = chr$(9)
+#define KEY_HOME = "{x13}"
+#define KEY_CLR  = "{x93}"
 
 .init
 '----
@@ -510,10 +525,50 @@ play : play ""
 
 .play_chunk_idx
 '--------------
-  play v$(0,chunk_idx), v$(1,chunk_idx), {x5F}
-  v$(2,chunk_idx), v$(3,chunk_idx), v$(4,chunk_idx), {x5F}
-  v$(5,chunk_idx)
-  
+  v1$ = v$(0,chunk_idx)
+  v2$ = v$(1,chunk_idx)
+  v3$ = v$(2,chunk_idx)
+  v4$ = v$(3,chunk_idx)
+  v5$ = v$(4,chunk_idx)
+  v6$ = v$(5,chunk_idx)
+
+  if echo_m = 0 and echo_b = 0 then begin
+    play v1$, v2$, v3$, v4$, v5$, v6$
+    return
+  bend
+
+  if echo_m = 1 and echo_b = 0 then begin
+    play v1$, v2$, v3$,    , v5$, v6$
+    sleep (echo_sz)
+    play    ,    ,    , v1$
+  bend
+
+  if echo_m = 1 and echo_b = 1 then begin
+    play v1$, v2$, v3$,    , v5$
+    sleep (echo_sz)
+    play    ,    ,    , v1$,    , v3$
+  bend
+
+  if echo_m = 2 and echo_b = 0 then begin
+    play v1$,    , v3$,    ,    , v6$
+    sleep (echo_sz)
+    play    ,    ,    , v1$
+    sleep (echo_sz)
+    play    , v1$
+    sleep (echo_sz)
+    play    ,    ,    ,    , v1$
+  bend
+
+  if echo_m = 2 and echo_b = 1 then begin
+    play v1$,    , v3$
+    sleep (echo_sz)
+    play    ,    ,    , v1$
+    sleep (echo_sz)
+    play    , v1$,    ,    ,    , v3$
+    sleep (echo_sz)
+    play    ,    ,    ,    , v1$
+  bend
+
   return
 
 .envelope_editor
@@ -725,10 +780,19 @@ play : play ""
   if k = CMD_FILTER then begin
     k = seq_extra(plyptr)
     fsrow = k
+    fsel = k
     gosub apply_selected_filter
   bend
+  if k = CMD_ECHO_M1 then echo_m = 1
+  if k = CMD_ECHO_M2 then echo_m = 2
+  if k = CMD_ECHO_B  then echo_b = 1
+  if k = CMD_ECHO_OFF then echo_m = 0 : echo_b = 0
+  if k = CMD_ECHO_SZ then echo_sz = seq_extra(plyptr)
 
   plyptr = plyptr + 1
+
+  if k = CMD_LOOP then plyptr = 0
+
   if plyptr >= seqcnt then plyflag = 0 : plyptr = -1
   return
 
@@ -1093,7 +1157,7 @@ play : play ""
 '----------------
   if seqcnt = 0 then return
 
-  k = 0
+  k = seqptr
   do while k < seqcnt - 1
     seq_chunk(k) = seq_chunk(k + 1)
     seq_extra(k) = seq_extra(k + 1)
@@ -1108,8 +1172,12 @@ play : play ""
 .edit_chunk_seq
 '--------------
   if seqcnt = 0 then return
+
+  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
   v=0:input "chunk#: ", v
   seq_chunk(seqptr) = v
+
+  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
   v=-1:input "extra#: ", v
   seq_extra(seqptr) = v
   return
