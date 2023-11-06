@@ -28,7 +28,7 @@ trap runstop_trapper
 '------------
 #declare chunk_idx = 0
 #declare chunk_cnt = 0
-#define chunk_max = 20
+#define chunk_max = 50
 
 #declare vidx, idx
 #declare cursor_x = 0
@@ -223,10 +223,14 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 #define KEY_TAB = chr$(9)
 #define KEY_HOME = "{x13}"
 #define KEY_CLR  = "{x93}"
+#define KEY_LOWERCASE = chr$(14)
+#define KEY_UPPERCASE = chr$(142)
+
+#define ESC_80_50 = KEY_ESCAPE;"5"
 
 .init
 '----
-print "{x93}"
+print "{x93}";KEY_LOWERCASE;ESC_80_50
 play : play ""
 
 .main
@@ -238,21 +242,25 @@ play : play ""
 
 .draw_editor_screen
 '------------------
-  cursor 0,0:print "playmaker v0.01 - by  gurce isikyildiz"
+  cursor 0,0:print "{x93}playmaker v0.5 - by gurce isikyildiz"
+  print "---------"
+  print "<: prev chunk, >: next chunk, -/+ tempo, F7=env editor, F9/CTRL-P=seq editor"
+  print "F1=load, F3=save, MEGA+Q=quit"
+  print
+
   gosub draw_current_chunk
   return
 
 .draw_current_chunk
 '------------------
-  print "{x93}"
-  print "tempo:      {x9D}{x9D}{x9D}{x9D}{x9D}"; tmpo%
-  print "chunk_idx:    {x9D}{x9D}{x9D}"; chunk_idx  
+  print "tempo: "; tmpo%
+  print "chunk_idx: "; chunk_idx  
    
   for vidx=0 to 5
     if cursor_y <> vidx then begin
-      cursor 0,5+vidx*2:print chr$(27);"q";"v";vidx;": ";v$(vidx,chunk_idx);
+      cursor 0,9+vidx*2:print chr$(27);"q";"v";vidx+1;": ";v$(vidx,chunk_idx);
     bend:else begin
-      cursor 0,5+vidx*2:print chr$(27);"q";"v";vidx;": ";
+      cursor 0,9+vidx*2:print chr$(27);"q";"v";vidx+1;": ";
       for idx=1 to len(v$(vidx,chunk_idx))
         if cursor_x = idx-1 then begin
           print "{x12}";mid$(v$(vidx,chunk_idx),idx,1);"{x92}";
@@ -316,6 +324,13 @@ play : play ""
 
   return
 
+.set_all_env
+'-----------
+  for row = 0 to 9
+    gosub set_env
+  next row
+  return
+
 .load
 '----
   input "load name: ";key$
@@ -325,7 +340,8 @@ play : play ""
 
   ' load melody chunks
   ' ------------------
-  for chunk_idx = 0 to chunk_max-1
+  input #2, chunk_cnt
+  for chunk_idx = 0 to chunk_cnt - 1
     for vidx=0 to 5
       input #2,v$(vidx, chunk_idx)
     next vidx
@@ -378,6 +394,18 @@ play : play ""
   chunk_idx = 0
   return
 
+.get_chunk_cnt
+'-------------
+  chunk_cnt = 0
+  for k = 0 to chunk_max
+    if v$(0,k)<>"" or v$(1,k)<>"" or v$(2,k)<>"" or v$(3,k)<>"" or v$(4,k)<>"" or v$(5,k)<>"" then begin
+      chunk_cnt = k + 1
+    bend
+  next k
+
+  return
+
+
 .save
 '----
   input "save name: ";key$
@@ -388,7 +416,9 @@ play : play ""
 
   ' save melody chunks
   ' ------------------
-  for chunk_idx = 0 to chunk_max-1
+  gosub get_chunk_cnt
+  print #2, chunk_cnt
+  for chunk_idx = 0 to chunk_cnt - 1
     for vidx=0 to 5
       print #2,v$(vidx, chunk_idx)
     next vidx
@@ -444,7 +474,7 @@ play : play ""
   delete (key$)
     
   dopen #2,(key$),w,u8
-  for chunk_idx = 0 to chunk_max-1
+  for chunk_idx = 0 to chunk_max
     for vidx=0 to 5
       print #2, "v";chr$(49+vidx);"$(";str$(chunk_idx);")=";
       print #2, chr$(34);v$(vidx, chunk_idx);chr$(34)
@@ -613,6 +643,7 @@ play : play ""
 '----------
   print "{x93}env editor";KEY_TAB;dur$(sdur, DNAME);KEY_TAB;"octave";oct
   print "----------"
+  print "-/+: decr/incr, RTN: edit, TAB: focus env/filter, MEGA+Q: exit"
   print
   print "   NAME";KEY_TAB;KEY_TAB;"ATTACK";KEY_TAB;"DECAY";KEY_TAB;"SUSTAIN";KEY_TAB;"RELEASE";KEY_TAB;
   print "WAVEFRM";KEY_TAB;"PULSEWIDTH"
@@ -1126,10 +1157,10 @@ play : play ""
 '-------------
   print "{x93}sequence editor"
   print "---------------"
-  print "A)dd I)nsert E)dit D)elete   - seqcnt = ";seqcnt
+  print "A)dd I)nsert D)elete, Edit=RTN, PlayAll=SHFT+RTN, Play=SPC - seqcnt = ";seqcnt
+  print "MEGA+Q: exit"
   print " Cmd            Extra"         
   print " ---            -----"
-
 
   k = 0
   do while k < seqcnt
@@ -1185,7 +1216,7 @@ play : play ""
 
   if a$="a" then gosub add_chunk_to_seq
   if a$="i" then gosub insert_chunk_to_seq
-  if a$="e" then gosub edit_chunk_seq
+  ' if a$="e" then gosub edit_chunk_seq
   if a$="d" then gosub delete_chunk_seq
 
   if a$=KEY_UP and seqptr > 0 then seqptr = seqptr - 1
@@ -1193,8 +1224,21 @@ play : play ""
   if a$=KEY_LEFT and sscol > 0 then sscol = sscol - 1
   if a$=KEY_RIGHT and sscol < 1 then sscol = sscol + 1
 
-  if a$=KEY_SHIFT_RETURN then plyptr = 0 : plyflag = 1 : chunk_rpt = 0
-  if a$=KEY_SPACE then plyptr = seqptr : plyflag = 1 : chunk_rpt = 0
+  if a$=KEY_SHIFT_RETURN then begin
+    plyptr = 0
+    plyflag = 1
+    chunk_rpt = 0
+    play
+    gosub set_all_env
+  bend
+
+  if a$=KEY_SPACE then begin
+    plyptr = seqptr
+    plyflag = 1
+    chunk_rpt = 0
+    play
+    gosub set_all_env
+  bend
   if a$=KEY_RETURN then gosub edit_chunk_cell
   if a$=KEY_ESCAPE then plyptr = -1 : plyflag = 0
   return
