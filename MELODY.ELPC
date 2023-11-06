@@ -245,7 +245,7 @@ play : play ""
   cursor 0,0:print "{x93}playmaker v0.5 - by gurce isikyildiz"
   print "---------"
   print "<: prev chunk, >: next chunk, -/+ tempo, F7=env editor, F9/CTRL-P=seq editor"
-  print "F1=load, F3=save, MEGA+Q=quit"
+  print "RTN: play curr voice, SHFT+RTN: play all voice, F1=load, F3=save, MEGA+Q=quit"
   print
 
   gosub draw_current_chunk
