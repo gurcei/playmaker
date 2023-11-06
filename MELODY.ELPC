@@ -356,6 +356,7 @@ play : play ""
     input #2, filt_bp(row)
     input #2, filt_hp(row)
     input #2, filt_res(row)
+    input #2, filt_dir(row)
     input #2, filt_min(row)
     input #2, filt_sweep(row)
   next row
@@ -415,6 +416,7 @@ play : play ""
     print #2, filt_bp(row)
     print #2, filt_hp(row)
     print #2, filt_res(row)
+    print #2, filt_dir(row)
     print #2, filt_min(row)
     print #2, filt_sweep(row)
   next row
@@ -1131,6 +1133,7 @@ play : play ""
 
   k = 0
   do while k < seqcnt
+    if k >= 43 then cursor 40,5+(k-43)
     if plyptr = k then print ">";:else print " ";
 
     s=0:gosub highlight_selected_seq_column
