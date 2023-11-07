@@ -106,7 +106,8 @@ FILTTYPE filt(10) = [ {x5F}
 #define CMD_ECHO_B  = -6   ' echo bass:   voice 3 on voice 6
 #define CMD_ECHO_OFF = -7
 #define CMD_ECHO_SZ = -8
-#define CMD_MAX = 9
+#define CMD_VOL = -9
+#define CMD_MAX = 10
 
 #declare seq_cmdname$(10)
 seq_cmdname$(1) = "TEMPO"
@@ -117,6 +118,7 @@ seq_cmdname$(5) = "ECHO_M2"
 seq_cmdname$(6) = "ECHO_B"
 seq_cmdname$(7) = "ECHO_OFF"
 seq_cmdname$(8) = "ECHO_SZ"
+seq_cmdname$(9) = "VOL"
 
 
 #declare seqcnt, seqptr
@@ -1159,7 +1161,7 @@ play : play ""
   print "{x93}sequence editor"
   print "---------------"
   print "A)dd I)nsert D)elete, Edit=RTN, PlayAll=SHFT+RTN, Play=SPC - seqcnt = ";seqcnt
-  print "MEGA+Q: exit"
+  print "C) edit CMD, MEGA+Q: exit"
   print " Cmd            Extra"         
   print " ---            -----"
 
@@ -1243,6 +1245,7 @@ play : play ""
     tempo tmpo%
   bend
   if a$=KEY_RETURN then gosub edit_chunk_cell
+  if a$="c" then gosub edit_chunk_cmd
   if a$=KEY_ESCAPE then plyptr = -1 : plyflag = 0
   return
 
@@ -1295,6 +1298,17 @@ play : play ""
     seq_extra(seqptr) = v
   bend
 
+  return
+
+.edit_chunk_cmd
+'--------------
+  print KEY_CLR;
+  for row = 1 to CMD_MAX - 1
+    print row;":"; seq_cmdname$(row)
+  next row
+  print
+  input "cmd: ", v
+  seq_chunk(seqptr) = -v
   return
 
 
