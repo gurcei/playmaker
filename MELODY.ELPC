@@ -93,7 +93,7 @@ FILTTYPE filt(10) = [ {x5F}
 ]
 
 #declare seq_chunk(100), seq_extra(100)
-#declare echo_m, echo_b, echo_sz = .05, chunk_rpt
+#declare echo_m, echo_b, echo_sz = .05, chunk_rpt, echo_delay
 #declare v1$, v2$, v3$, v4$, v5$, v6$
 #declare tmp
 
@@ -116,7 +116,8 @@ FILTTYPE filt(10) = [ {x5F}
 #define CMD_ECHO_OFF = -7
 #define CMD_ECHO_SZ = -8
 #define CMD_VOL = -9
-#define CMD_MAX = 10
+#define CMD_DELAY = -10
+#define CMD_MAX = 11
 
 #declare seq_cmdname$(10)
 seq_cmdname$(1) = "TEMPO"
@@ -128,7 +129,7 @@ seq_cmdname$(6) = "ECHO_B"
 seq_cmdname$(7) = "ECHO_OFF"
 seq_cmdname$(8) = "ECHO_SZ"
 seq_cmdname$(9) = "VOL"
-
+seq_cmdname$(10) = "DELAY"
 
 #declare seqcnt, seqptr
 
@@ -598,6 +599,22 @@ play : play ""
   v5$ = v$(4,chunk_idx)
   v6$ = v$(5,chunk_idx)
 
+  if echo_delay = 1 then begin
+    play v1$
+    sleep (echo_sz)
+    play ,v2$
+    sleep (echo_sz)
+    play ,,v3$
+    sleep (echo_sz)
+    play ,,,v4$
+    sleep (echo_sz)
+    play ,,,,v5$
+    sleep (echo_sz)
+    play ,,,,,v6$
+    sleep (echo_sz)
+    return
+  bend
+
   if echo_m = 0 and echo_b = 0 then begin
     play v1$, v2$, v3$, v4$, v5$, v6$
     return
@@ -858,6 +875,7 @@ play : play ""
   if k = CMD_ECHO_B  then echo_b = 1
   if k = CMD_ECHO_OFF then echo_m = 0 : echo_b = 0
   if k = CMD_ECHO_SZ then echo_sz = seq_extra(plyptr)
+  if k = CMD_DELAY then echo_delay = 1 : echo_m = 0 : echo_b = 0
 
   if k = CMD_VOL then v = seq_extra(plyptr) : vol v, v
 
