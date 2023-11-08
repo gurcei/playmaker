@@ -260,7 +260,7 @@ color 5
   print "---------"
   print "<: prev chunk, >: next chunk, -/+ tempo, F7=env editor, F9/CTRL-P=seq editor"
   print "RTN: play curr voice, SHFT+RTN: play all voice, F1=load, F3=save, MEGA+Q=quit"
-  print "ALT-X/C/V: row cut/copy/paste"
+  print "ALT-X/C/V: row cut/copy/paste, ESC-ESC: stop music, ALT-RTN: play from cursor"
   print
 
   gosub draw_current_chunk
@@ -606,6 +606,11 @@ color 5
   if key$="x" then clip$=v$(cursor_y, chunk_idx) : v$(cursor_y, chunk_idx) = ""
   if key$="c" then clip$=v$(cursor_y, chunk_idx)
   if key$="v" then v$(cursor_y, chunk_idx) = clip$
+
+  if key$=KEY_RETURN then begin
+    v1$ = mid$(v$(cursor_y, chunk_idx), cursor_x + 1)
+    tempo tmpo% : play v1$
+  bend
 
   key$ = ""
   return
