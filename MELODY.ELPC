@@ -544,6 +544,7 @@ color 5
     esc_flag%=0
     if key$ = "j" then begin:cursor_x=0:bend
     if key$ = "k" then begin:cursor_x=len(v$(cursor_y,chunk_idx)):bend
+    if key$=KEY_ESCAPE then gosub stop_all_music
     key$=""
   bend
 
@@ -960,21 +961,23 @@ color 5
 
 .apply_selected_filter
 '---------------------
-  curr_freq = filt_freq(fsrow)
+  if fsel = -1 then return
+
+  curr_freq = filt_freq(fsel)
   curr_dir = DIR_NONE
-  if   filt_dir(fsrow) = DIR_UP {x5F}
-    or filt_dir(fsrow) = DIR_OSC then begin
-    curr_freq = filt_min(fsrow)
+  if   filt_dir(fsel) = DIR_UP {x5F}
+    or filt_dir(fsel) = DIR_OSC then begin
+    curr_freq = filt_min(fsel)
     curr_dir = DIR_UP
   bend
-  if filt_dir(fsrow) = DIR_DOWN then begin
+  if filt_dir(fsel) = DIR_DOWN then begin
     curr_dir = DIR_DOWN
   bend
 
-  filter 1, filt_freq(fsrow), filt_lp(fsrow), {x5F} 
-         filt_bp(fsrow), filt_hp(fsrow), filt_res(fsrow)
-  filter 2, filt_freq(fsrow), filt_lp(fsrow), {x5F} 
-         filt_bp(fsrow), filt_hp(fsrow), filt_res(fsrow)
+  filter 1, filt_freq(fsel), filt_lp(fsel), {x5F} 
+         filt_bp(fsel), filt_hp(fsel), filt_res(fsel)
+  filter 2, filt_freq(fsel), filt_lp(fsel), {x5F} 
+         filt_bp(fsel), filt_hp(fsel), filt_res(fsel)
 
   return
 
@@ -1294,18 +1297,20 @@ color 5
   bend
   if a$=KEY_RETURN then gosub edit_chunk_cell
   if a$="c" then gosub edit_chunk_cmd
-  if a$=KEY_ESCAPE then begin
-    plyptr = -1
-    plyflag = 0
-    play
-    gosub set_all_env
-    tempo tmpo%
-  bend
+  if a$=KEY_ESCAPE then gosub stop_all_music
   if a$=KEY_HOME then seqptr = 0
   if a$=KEY_CLR then seqptr = seqcnt-1
-    
-  bend
 
+  return
+
+.stop_all_music
+'--------------
+  plyptr = -1
+  plyflag = 0
+  play
+  gosub set_all_env
+  tempo tmpo%
+  gosub apply_selected_filter
   return
 
 .delete_chunk_seq
