@@ -243,6 +243,8 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 '----
 print "{x93}";KEY_LOWERCASE;KEY_ESCAPE;"5";
 play : play ""
+background 0 : border 0
+color 5
 
 .main
 '----
