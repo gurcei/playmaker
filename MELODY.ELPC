@@ -208,6 +208,7 @@ dur$(D_SIXTEENTH, DNAME) = "sixteenth"
 dur$(D_SIXTEENTH, DCHAR) = "s"
 dur$(D_SIXTEENTH, DKEY)  = "5"
 
+#declare clip$, alt_key
 
 .keys
 '----
@@ -259,6 +260,7 @@ color 5
   print "---------"
   print "<: prev chunk, >: next chunk, -/+ tempo, F7=env editor, F9/CTRL-P=seq editor"
   print "RTN: play curr voice, SHFT+RTN: play all voice, F1=load, F3=save, MEGA+Q=quit"
+  print "ALT-X/C/V: row cut/copy/paste"
   print
 
   gosub draw_current_chunk
@@ -507,6 +509,8 @@ color 5
   gosub read_key_loop
   key$ = a$
 
+  gosub check_alt_key_inputs
+
   ' down arrow?
   if key$ = KEY_DOWN and cursor_y<5 then begin
     cursor_y = cursor_y + 1
@@ -590,6 +594,19 @@ color 5
   bend
 
   gosub check_valid_key
+  return
+
+.check_alt_key_inputs
+'--------------------
+  alt_key = peek($d611) and 16
+
+  if alt_key = 0 then return
+
+  if key$="x" then clip$=v$(cursor_y, chunk_idx) : v$(cursor_y, chunk_idx) = ""
+  if key$="c" then clip$=v$(cursor_y, chunk_idx)
+  if key$="v" then v$(cursor_y, chunk_idx) = clip$
+
+  key$ = ""
   return
 
 .play_chunk_idx
