@@ -870,9 +870,9 @@ play : play ""
     fsel = k
     gosub apply_selected_filter
   bend
-  if k = CMD_ECHO_M1 then echo_m = 1
-  if k = CMD_ECHO_M2 then echo_m = 2
-  if k = CMD_ECHO_B  then echo_b = 1
+  if k = CMD_ECHO_M1 then echo_m = 1 : echo_delay = 0
+  if k = CMD_ECHO_M2 then echo_m = 2 : echo_delay = 0
+  if k = CMD_ECHO_B  then echo_b = 1 : echo_delay = 0
   if k = CMD_ECHO_OFF then echo_m = 0 : echo_b = 0
   if k = CMD_ECHO_SZ then echo_sz = seq_extra(plyptr)
   if k = CMD_DELAY then echo_delay = 1 : echo_m = 0 : echo_b = 0
@@ -1190,7 +1190,7 @@ play : play ""
   print "{x93}sequence editor"
   print "---------------"
   print "A)dd I)nsert D)elete, Edit=RTN, PlayAll=SHFT+RTN, Play=SPC - seqcnt = ";seqcnt
-  print "C: edit CMD, MEGA+Q: exit"
+  print "C: edit CMD, ESC: stop music, MEGA+Q: exit"
   print " Cmd            Extra"         
   print " ---            -----"
 
@@ -1275,7 +1275,17 @@ play : play ""
   bend
   if a$=KEY_RETURN then gosub edit_chunk_cell
   if a$="c" then gosub edit_chunk_cmd
-  if a$=KEY_ESCAPE then plyptr = -1 : plyflag = 0
+  if a$=KEY_ESCAPE then begin
+    plyptr = -1
+    plyflag = 0
+    play
+    gosub set_all_env
+    tempo tmpo%
+  bend
+  if a$=KEY_HOME then seqptr = 0
+  if a$=KEY_CLR then seqptr = seqcnt-1
+    
+  bend
 
   return
 
