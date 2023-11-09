@@ -208,7 +208,7 @@ dur$(D_SIXTEENTH, DNAME) = "sixteenth"
 dur$(D_SIXTEENTH, DCHAR) = "s"
 dur$(D_SIXTEENTH, DKEY)  = "5"
 
-#declare clip$, alt_key
+#declare clip$, alt_key, limit, ret%
 
 .keys
 '----
@@ -239,7 +239,7 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 #define KEY_CLR  = "{x93}"
 #define KEY_LOWERCASE = chr$(14)
 #define KEY_UPPERCASE = chr$(142)
-
+#define KEY_BEEP = chr$(7)
 .init
 '----
 print "{x93}";KEY_LOWERCASE;KEY_ESCAPE;"5";
@@ -612,7 +612,54 @@ color 5
     tempo tmpo% : play v1$
   bend
 
+  if key$="," then delta = -1 : gosub transpose_octave
+  if key$="." then delta = 1  : gosub transpose_octave
+
   key$ = ""
+  return
+
+.transpose_octave
+'----------------
+  v1$ = v$(cursor_y, chunk_idx)
+
+  limit = 0
+  if delta = 1 then limit = 6
+
+  ret% = 0
+  gosub can_transpose_octave
+
+  if ret% = 0 then print KEY_BEEP; : return
+
+  k = 0
+  do while k < len(v1$)
+    v2$ = mid$(v1$,k+1,1)
+    if v2$ = "o" and (k + 1) < len(v1$) then begin
+      v2$ = str$(val(mid$(v1$,k+2,1)) + delta)
+      v2$ = mid$(v2$,2)
+      v1$ = left$(v1$,k+1) + v2$ + mid$(v1$, k+3)
+    bend
+    k = k + 1
+  loop
+
+  v$(cursor_y, chunk_idx) = v1$
+
+  return
+
+.can_transpose_octave
+'--------------------
+  ret% = 1
+
+  k = 0
+  do while k < len(v1$)
+    v2$ = mid$(v1$,k+1,1)
+    if v2$ = "o" and (k+1) < len(v1$) then begin
+      v2$ = mid$(v1$,k+2,1)
+      if val(v2$) = limit then ret% = 0 : return
+    bend
+
+    k = k + 1
+  loop
+
   return
 
 .play_chunk_idx
@@ -1355,14 +1402,22 @@ color 5
 
   if sscol = 0 then begin
     v = seq_chunk(seqptr)
-    print "chunk#: ";KEY_ESCAPE;"^{x14}";v;KEY_ESCAPE;"{x5F}";
+
+    v1$ = str$(v)
+    if left$(v1$,1) = " " then v1$=mid$(v1$,2)
+
+    print "chunk#: ";v1$;
     input "", v
     seq_chunk(seqptr) = v
   bend
 
   if sscol = 1 then begin
     v = seq_extra(seqptr)
-    print "extra#: ";KEY_ESCAPE;"^{x14}";v;KEY_ESCAPE;"{x5F}";
+
+    v1$ = str$(v)
+    if left$(v1$,1) = " " then v1$=mid$(v1$,2)
+
+    print "extra#: ";v1$;
     input "", v
     seq_extra(seqptr) = v
   bend
@@ -1371,13 +1426,15 @@ color 5
 
 .edit_chunk_cmd
 '--------------
+  v = -seq_chunk(seqptr)
   print KEY_CLR;
   for row = 1 to CMD_MAX - 1
     print row;":"; seq_cmdname$(row)
   next row
   print
   input "cmd: ", v
-  seq_chunk(seqptr) = -v
+
+  if v > 0 then seq_chunk(seqptr) = -v
   return
 
 
