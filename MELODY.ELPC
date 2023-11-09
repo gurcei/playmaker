@@ -1415,7 +1415,7 @@ color 5
     v1$ = str$(v)
     if left$(v1$,1) = " " then v1$=mid$(v1$,2)
 
-    print "chunk#: ";v1$;
+    print "chunk#: ";KEY_ESCAPE;"^";v1$;KEY_ESCAPE;"{x5F}";
     input "", v
     seq_chunk(seqptr) = v
   bend
@@ -1426,7 +1426,7 @@ color 5
     v1$ = str$(v)
     if left$(v1$,1) = " " then v1$=mid$(v1$,2)
 
-    print "extra#: ";v1$;
+    print "extra#: ";KEY_ESCAPE;"^";v1$;KEY_ESCAPE;"{x5F}";
     input "", v
     seq_extra(seqptr) = v
   bend
