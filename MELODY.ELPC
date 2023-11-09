@@ -240,6 +240,9 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 #define KEY_LOWERCASE = chr$(14)
 #define KEY_UPPERCASE = chr$(142)
 #define KEY_BEEP = chr$(7)
+#define KEY_INST = "{x94}"
+#define KEY_DEL  = "{x14}"
+
 .init
 '----
 print "{x93}";KEY_LOWERCASE;KEY_ESCAPE;"5";
@@ -592,6 +595,12 @@ color 5
   if key$ = KEY_SHIFT_RETURN then begin
     tempo tmpo%
     gosub play_chunk_idx
+  bend
+
+  if key$ = KEY_INST then begin
+    v1$ = v$(cursor_y, chunk_idx)
+    v1$ = left$(v1$,cursor_x) + mid$(v1$,cursor_x+2)
+    v$(cursor_y, chunk_idx) = v1$
   bend
 
   gosub check_valid_key
