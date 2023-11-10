@@ -92,10 +92,12 @@ FILTTYPE filt(10) = [ {x5F}
 {x5F}
 ]
 
-#declare seq_chunk(100), seq_extra(100)
+#declare seq_chunk(200), seq_extra(200)
 #declare echo_m, echo_b, echo_sz = .05, chunk_rpt, echo_delay
 #declare v1$, v2$, v3$, v4$, v5$, v6$
 #declare tmp
+#declare sscol, s, seq_offs
+
 
 #define OP_COPY = 0
 #define OP_MIX  = 1
@@ -1302,8 +1304,6 @@ color 5
   loop
   return
 
-#declare sscol, s
-
 .draw_sequence
 '-------------
   print "{x93}sequence editor"
@@ -1313,9 +1313,20 @@ color 5
   print " Cmd            Extra"         
   print " ---            -----"
 
-  k = 0
+  if int((seqcnt-1)/43) > 1 and (int(seq_offs/43)+1) < int((seqcnt-1)/43) then begin
+    'if int((seqcnt-1) / 43) * 43 > seq_offs then begin
+      cursor 75, 5:print "--->"
+    'bend
+  bend
+  if seq_offs > 0 then begin
+    cursor 70, 5:print "<---"
+  bend
+
+  k = seq_offs
   do while k < seqcnt
-    if k >= 43 then cursor 40,5+(k-43)
+    if k > (seq_offs + 43 * 2 - 1) then k=seqcnt:goto nxt
+
+    if (k-seq_offs) >= 43 then cursor 40,6+(k-seq_offs-43)
     if plyptr = k then print ">";:else print " ";
 
     s=0:gosub highlight_selected_seq_column
@@ -1351,6 +1362,8 @@ color 5
     bend
 
     print KEY_REV_OFF;
+
+.nxt
     k = k + 1
   loop
   
@@ -1373,19 +1386,23 @@ color 5
   if a$=KEY_UP and seqptr > 0 then seqptr = seqptr - 1
   if a$=KEY_DOWN and seqptr < seqcnt-1 then seqptr = seqptr + 1 
   if a$=KEY_LEFT then begin
-    if sscol = 0 and seqptr >= 43 then begin
-      sscol = 1
-      seqptr = seqptr - 43
+    if sscol = 1 then begin
+      sscol = 0
     bend:else begin
-      if sscol > 0 then sscol = sscol - 1
+      if (seqptr-43)>=0 then begin
+        sscol = 1
+        seqptr = seqptr - 43
+      bend
     bend
   bend
   if a$=KEY_RIGHT then begin
-    if sscol = 1 and seqptr < 43 then begin
-      sscol = 0
-      seqptr = seqptr + 43
+    if sscol = 0 then begin
+      sscol = 1
     bend:else begin
-      if sscol < 1 then sscol = sscol + 1
+      if (seqptr+43) < seqcnt then begin
+        sscol = 0
+        seqptr = seqptr + 43
+      bend
     bend
   bend
 
@@ -1411,6 +1428,10 @@ color 5
   if a$=KEY_ESCAPE then gosub stop_all_music
   if a$=KEY_HOME then seqptr = 0
   if a$=KEY_CLR then seqptr = seqcnt-1
+
+  ' finally, adjust seq_offs if needbe
+  if (int(seqptr / 43) * 43) < seq_offs then seq_offs = seq_offs - 43
+  if (int(seqptr / 43) * 43) > (seq_offs+43) then seq_offs = seq_offs + 43
 
   return
 
