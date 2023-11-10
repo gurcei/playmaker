@@ -208,7 +208,7 @@ dur$(D_SIXTEENTH, DNAME) = "sixteenth"
 dur$(D_SIXTEENTH, DCHAR) = "s"
 dur$(D_SIXTEENTH, DKEY)  = "5"
 
-#declare clip$, alt_key, limit, ret%
+#declare clip$, alt_key, limit, ret%, y, cp$(6)
 
 .keys
 '----
@@ -615,6 +615,8 @@ color 5
   if key$="x" then clip$=v$(cursor_y, chunk_idx) : v$(cursor_y, chunk_idx) = ""
   if key$="c" then clip$=v$(cursor_y, chunk_idx)
   if key$="v" then v$(cursor_y, chunk_idx) = clip$
+  if key$="C" then gosub copy_all_voices_to_clipboard
+  if key$="V" then gosub paste_all_voices_from_clipboard
 
   if key$=KEY_RETURN then begin
     v1$ = mid$(v$(cursor_y, chunk_idx), cursor_x + 1)
@@ -623,8 +625,42 @@ color 5
 
   if key$="," then delta = -1 : gosub transpose_octave
   if key$="." then delta = 1  : gosub transpose_octave
+  if key$="i" then gosub insert_chunk
 
   key$ = ""
+  return
+
+.copy_all_voices_to_clipboard
+'----------------------------
+  for y = 0 to 5
+    cp$(y) = v$(y, chunk_idx)
+  next y
+  return
+
+.paste_all_voices_from_clipboard
+'-------------------------------
+  for y = 0 to 5
+    v$(y, chunk_idx) = cp$(y)
+  next y
+  return
+
+.insert_chunk
+'------------
+  for k = chunk_max-1 to chunk_idx + 1 step -1
+    for y = 0 to 5
+      v$(y, k) = v$(y, k-1)
+    next y
+  next k
+
+  for y = 0 to 5
+    v$(y, chunk_idx) = ""
+  next y
+
+  ' repair items in the sequence that are affected
+  for k = 0 to 100
+    if seq_chunk(k) >= chunk_idx then seq_chunk(k) = seq_chunk(k) + 1
+  next k
+
   return
 
 .transpose_octave
@@ -1336,8 +1372,22 @@ color 5
 
   if a$=KEY_UP and seqptr > 0 then seqptr = seqptr - 1
   if a$=KEY_DOWN and seqptr < seqcnt-1 then seqptr = seqptr + 1 
-  if a$=KEY_LEFT and sscol > 0 then sscol = sscol - 1
-  if a$=KEY_RIGHT and sscol < 1 then sscol = sscol + 1
+  if a$=KEY_LEFT then begin
+    if sscol = 0 and seqptr >= 43 then begin
+      sscol = 1
+      seqptr = seqptr - 43
+    bend:else begin
+      if sscol > 0 then sscol = sscol - 1
+    bend
+  bend
+  if a$=KEY_RIGHT then begin
+    if sscol = 1 and seqptr < 43 then begin
+      sscol = 0
+      seqptr = seqptr + 43
+    bend:else begin
+      if sscol < 1 then sscol = sscol + 1
+    bend
+  bend
 
   if a$=KEY_SHIFT_RETURN then begin
     plyptr = 0
