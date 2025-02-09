@@ -617,8 +617,8 @@ color 5
   if key$="x" then clip$=v$(cursor_y, chunk_idx) : v$(cursor_y, chunk_idx) = ""
   if key$="c" then clip$=v$(cursor_y, chunk_idx)
   if key$="v" then v$(cursor_y, chunk_idx) = clip$
-  if key$="C" then gosub copy_all_voices_to_clipboard
-  if key$="V" then gosub paste_all_voices_from_clipboard
+  if key$="d" then gosub copy_all_voices_to_clipboard
+  if key$="f" then gosub paste_all_voices_from_clipboard
 
   if key$=KEY_RETURN then begin
     v1$ = mid$(v$(cursor_y, chunk_idx), cursor_x + 1)
@@ -1410,7 +1410,7 @@ color 5
     plyptr = 0
     plyflag = 1
     chunk_rpt = 0
-    play
+    play:play ""
     gosub set_all_env
     tempo tmpo%
   bend
@@ -1419,7 +1419,7 @@ color 5
     plyptr = seqptr
     plyflag = 1
     chunk_rpt = 0
-    play
+    play:play ""
     gosub set_all_env
     tempo tmpo%
   bend
@@ -1439,7 +1439,7 @@ color 5
 '--------------
   plyptr = -1
   plyflag = 0
-  play
+  play:play ""
   gosub set_all_env
   tempo tmpo%
   gosub apply_selected_filter
