@@ -1,0 +1,351 @@
+#output "transpose"
+
+'-------
+.declares
+'-------
+#declare cur_octave, cur_v$, cur_flat_sharp, transpose_state
+#declare error$, error, k, ch$, trans_dir, trans_v$
+#declare verbose, test$, new_octave_flag
+#declare note$(12), cur_note$, note_idx, prev_octave = -1, prev_trans_octave = -1
+#declare handled, tmp, octave_tweaked
+
+
+'-------
+.defines
+'-------
+#define TSTATE_MAIN   = 1
+#define TSTATE_OCTAVE = 2
+
+#define NOTE_FLAT   = -1
+#define NOTE_NORMAL = 0
+#define NOTE_SHARP  = 1
+
+#define TRANS_UP = 0
+#define TRANS_DOWN = 1
+
+#define ERR_INVALID_OCTAVE = 1
+#define ERR_MISSING_OCTAVE = 2
+#define ERR_OCTAVE_OVERFLOW = 3
+#define ERR_OCTAVE_UNDERFLOW = 4
+
+note$(0) = "c"
+note$(1) = "#c"
+note$(2) = "d"
+note$(3) = "#d"
+note$(4) = "e"
+note$(5) = "f"
+note$(6) = "#f"
+note$(7) = "g"
+note$(8) = "#g"
+note$(9) = "a"
+note$(10) = "#a"
+note$(11) = "b"
+
+verbose = 1
+
+
+'----
+.main
+'----
+  print chr$(147);
+  test$ = "invalid octave"
+  cur_v$ = "ozedc"
+  trans_dir = TRANS_UP
+  gosub run_test
+  if error = ERR_INVALID_OCTAVE then gosub pass:else gosub fail
+
+  test$ = "missing octave"
+  cur_v$ = "edc"
+  gosub run_test
+  if error = ERR_MISSING_OCTAVE then gosub pass:else gosub fail
+
+  test$ = "octave overflow"
+  cur_v$ = "o6b"
+  gosub run_test
+  if error = ERR_OCTAVE_OVERFLOW then gosub pass:else gosub fail
+
+  test$ = "octave underflow"
+  cur_v$ = "o0c"
+  trans_dir = TRANS_DOWN
+  gosub run_test
+  if error = ERR_OCTAVE_UNDERFLOW then gosub pass:else gosub fail
+
+  test$ = "simple transpose up"
+  cur_v$ = "o1edc"
+  trans_dir = TRANS_UP
+  gosub run_test
+  if error = 0 and trans_v$="o1f#d#c" then gosub pass:else gosub fail
+
+  test$ = "simple transpose down"
+  cur_v$ = "o1gfe"
+  trans_dir = TRANS_DOWN
+  gosub run_test
+  if error = 0 and trans_v$="o1#fe#d" then gosub pass:else gosub fail
+
+  test$ = "tricky transpose up"
+  cur_v$ = "o1gab"
+  trans_dir = TRANS_UP
+  gosub run_test
+  if error = 0 and trans_v$="o1#g#ao2c" then gosub pass:else gosub fail
+
+  test$ = "tricky transpose down"
+  cur_v$ = "o1edc"
+  trans_dir = TRANS_DOWN
+  gosub run_test
+  if error = 0 and trans_v$="o1#d#co0b" then gosub pass:else gosub fail
+
+  test$ = "tricky up-down revert"
+  cur_v$ = "o1gab"
+  trans_dir = TRANS_UP
+  gosub run_test
+  cur_v$ = trans_v$
+  trans_dir = TRANS_DOWN
+  gosub run_test
+  if error = 0 and trans_v$="o1gab" then gosub pass:else gosub fail
+
+  test$ = "tricky down-up revert"
+  cur_v$ = "o1edc"
+  trans_dir = TRANS_DOWN
+  gosub run_test
+  cur_v$ = trans_v$
+  trans_dir = TRANS_UP
+  gosub run_test
+  if error = 0 and trans_v$="o1edc" then gosub pass:else gosub fail
+
+  test$ = "pass through other chars"
+  cur_v$ = "t2 o1g x1a x0b u4 p m3 p5 l"
+  trans_dir = TRANS_UP
+  gosub run_test
+  if error = 0 and trans_v$="t2 o1#g x1#a x0o2c u4 p m3 p5 l" then gosub pass:else gosub fail
+
+  test$ = "edge case #1"
+  cur_v$ = "o3b #f"
+  trans_dir = TRANS_UP
+  gosub run_test
+  if error = 0 and trans_v$="o4c o3g" then gosub pass:else gosub fail
+
+  test$ = "edge case #2"
+  cur_v$ = "o2a o3e g"
+  trans_dir = TRANS_UP
+  gosub run_test
+  if error = 0 and trans_v$="o2#a o3f #g" then gosub pass:else gosub fail
+
+  test$ = "edge case #3"
+  cur_v$ = "o2ccc"
+  trans_dir = TRANS_DOWN
+  gosub run_test
+  if error = 0 and trans_v$="o1bbb" then gosub pass:else gosub fail
+
+  end
+
+
+'----
+.pass
+'----
+  print "{x5}[";chr$(30);"PASS{x5}] ";test$
+  return
+
+
+'----
+.fail
+'----
+  print "{x5}[{x1C}FAIL{x5}] ";test$
+  return
+
+
+'--------
+.run_test
+'--------
+  gosub init_vars
+
+  if verbose then print "{x93}before: "; cur_v$
+
+  gosub transpose
+
+  if verbose then begin
+    if error <> 0 then begin
+      print spc(k + 7);"{x96}^"
+      print "{x1C}?";error$;"{x5}"
+    bend
+
+    print " after: "; trans_v$
+    print
+    print "cur_octave = ";cur_octave
+  bend
+
+  return
+
+
+'---------
+.init_vars
+'---------
+  new_octave_flag = 0
+  cur_octave = -1
+  prev_octave = -1
+  cur_flat_sharp = NOTE_NORMAL
+  transpose_state = TSTATE_MAIN
+  error = 0
+  error$ = ""
+  return
+
+
+
+'----------
+.state_main
+'----------
+  handled = 0
+
+  if ch$ = "o" then handled = 1 : transpose_state = TSTATE_OCTAVE
+  if instr("#$", ch$) then handled = 1 : gosub state_sharp_flat
+  if instr("abcdefg", ch$) then handled = 1 : gosub state_note
+
+  if handled = 0 then begin
+    trans_v$ = trans_v$ + ch$
+  bend
+
+  return
+
+
+'----------------
+.state_sharp_flat
+'----------------
+  if ch$ = "#" then cur_flat_sharp = NOTE_SHARP
+  if ch$ = "$" then cur_flat_sharp = NOTE_FLAT
+  return
+
+
+'----------
+.state_note
+'----------
+  if verbose then print "STATE_NOTE: prev_oct=";prev_octave;", cur_oct=";cur_octave
+
+  if cur_octave = -1 then begin
+    error$="no explicit octave found before note"
+    error=ERR_MISSING_OCTAVE
+    return
+  bend
+
+  cur_note$ = ""
+  octave_tweaked = 0
+  if cur_flat_sharp = NOTE_SHARP then cur_note$ = "#"
+  if cur_flat_sharp = NOTE_FLAT then cur_note$ = "$"
+  cur_note$ = cur_note$ + ch$
+
+  gosub get_cur_note_idx
+
+  if verbose then print "note_idx=";note_idx
+
+  if trans_dir = TRANS_UP then begin
+    note_idx = note_idx + 1
+
+    if note_idx > 11 then begin
+      octave_tweaked = 1
+      prev_octave = cur_octave
+      cur_octave = cur_octave + 1
+      note_idx = 0
+      new_octave_flag = 1
+
+      if cur_octave > 6 then begin
+        error$="octave overflow"
+        error=ERR_OCTAVE_OVERFLOW
+        return
+      bend
+    bend
+  bend
+
+  if trans_dir = TRANS_DOWN then begin
+    note_idx = note_idx - 1
+    if note_idx < 0 then begin
+      octave_tweaked = 1
+      prev_octave = cur_octave
+      cur_octave = cur_octave - 1
+      new_octave_flag = 1
+      note_idx = 11
+
+      if verbose then print "prev_oct=";prev_octave;", cur_oct=";cur_octave
+
+      if cur_octave < 0 then begin
+        error$="octave underflow"
+        error=ERR_OCTAVE_UNDERFLOW
+        return
+      bend
+    bend
+  bend
+
+  if new_octave_flag then begin
+    if cur_octave <> prev_trans_octave then begin
+      trans_v$ = trans_v$ + "o" + mid$(str$(cur_octave), 2)
+      prev_trans_octave = cur_octave
+
+      if verbose then print "prev_trans_octave = ";prev_trans_octave
+
+      if prev_octave <> -1 and octave_tweaked then begin
+        ' revert to previous octave, as following notes might not suit tweaked octave
+        tmp = cur_octave
+        cur_octave = prev_octave
+        prev_octave = tmp
+        if verbose then print "SWAP: prev_oct=";prev_octave;", cur_oct=";cur_octave
+      bend : else begin
+        new_octave_flag = 0
+      bend
+    bend : else begin
+      new_octave_flag = 0
+    bend
+  bend
+
+  if new_octave_flag = 0 then begin
+    prev_octave = cur_octave
+  bend
+
+  cur_note$ = note$(note_idx)
+  trans_v$ = trans_v$ + cur_note$
+
+  cur_flat_sharp = NOTE_NORMAL
+
+  return
+
+
+'----------------
+.get_cur_note_idx
+'----------------
+  for note_idx = 0 to 11
+    if note$(note_idx) = cur_note$ then return
+  next note_idx
+
+  note_idx = -1  ' not found
+
+  return
+
+
+'------------
+.state_octave
+'------------
+  if ch$ < "0" or ch$ > "6" then begin
+    error$="invalid octave value"
+    error=ERR_INVALID_OCTAVE
+    return
+  bend
+
+  cur_octave = val(ch$)
+  new_octave_flag = 1
+
+  transpose_state = TSTATE_MAIN
+  return
+
+
+'---------
+.transpose
+'---------
+  cur_octave = -1
+  prev_octave = -1
+  trans_v$ = ""
+  transpose_state = TSTATE_MAIN
+
+  for k = 1 to len(cur_v$)
+    ch$ = mid$(cur_v$, k, 1)
+    on transpose_state gosub state_main, state_octave
+    if error <> 0 then k = len(cur_v$)  ' bail early
+  next k
+
+  return
+ÿ
