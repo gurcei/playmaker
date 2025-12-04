@@ -274,27 +274,23 @@ verbose = 0
     bend
   bend
 
-'  if new_octave_flag then begin
-    if cur_octave <> prev_trans_octave or prev_octave = -1 then begin
-      trans_v$ = trans_v$ + "o" + mid$(str$(cur_octave), 2)
-      prev_trans_octave = cur_octave
-    bend
-    
-    if verbose then print "prev_trans_octave = ";prev_trans_octave
-
-    if prev_octave <> -1 and octave_tweaked then begin
-      ' revert to previous octave, as following notes might not suit tweaked octave
-      tmp = cur_octave
-      cur_octave = prev_octave
-      prev_octave = tmp
-      if verbose then print "SWAP: prev_oct=";prev_octave;", cur_oct=";cur_octave
-    bend
-    new_octave_flag = 0
-'  bend
-
-  if new_octave_flag = 0 then begin
-    prev_octave = cur_octave
+  if cur_octave <> prev_trans_octave or prev_octave = -1 then begin
+    trans_v$ = trans_v$ + "o" + mid$(str$(cur_octave), 2)
+    prev_trans_octave = cur_octave
   bend
+    
+  if verbose then print "prev_trans_octave = ";prev_trans_octave
+
+  if prev_octave <> -1 and octave_tweaked then begin
+    ' revert to previous octave, as following notes might not suit tweaked octave
+    tmp = cur_octave
+    cur_octave = prev_octave
+    prev_octave = tmp
+    if verbose then print "SWAP: prev_oct=";prev_octave;", cur_oct=";cur_octave
+  bend
+  new_octave_flag = 0
+
+  prev_octave = cur_octave
 
   cur_note$ = note$(note_idx)
   trans_v$ = trans_v$ + cur_note$
