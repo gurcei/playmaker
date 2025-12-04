@@ -242,8 +242,10 @@ verbose = 0
       octave_tweaked = 1
       prev_octave = cur_octave
       cur_octave = cur_octave + 1
-      note_idx = 0
       new_octave_flag = 1
+      note_idx = 0
+
+      if verbose then print "prev_oct=";prev_octave;", cur_oct=";cur_octave
 
       if cur_octave > 6 then begin
         error$="octave overflow"
@@ -272,8 +274,8 @@ verbose = 0
     bend
   bend
 
-  if new_octave_flag then begin
-    if cur_octave <> prev_trans_octave then begin
+'  if new_octave_flag then begin
+    if cur_octave <> prev_trans_octave or prev_octave = -1 then begin
       trans_v$ = trans_v$ + "o" + mid$(str$(cur_octave), 2)
       prev_trans_octave = cur_octave
     bend
@@ -288,7 +290,7 @@ verbose = 0
       if verbose then print "SWAP: prev_oct=";prev_octave;", cur_oct=";cur_octave
     bend
     new_octave_flag = 0
-  bend
+'  bend
 
   if new_octave_flag = 0 then begin
     prev_octave = cur_octave
