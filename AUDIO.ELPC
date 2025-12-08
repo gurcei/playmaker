@@ -1,0 +1,462 @@
+#output "audio"
+
+
+'--------
+.declares
+'--------
+#declare a$, t, oldx, oldy, dt, v, k
+#declare state, state$(4)
+#declare xpos, ypos, frame(4), old_frame(4)
+#declare fstart, fplayback, floop, fend, looping, srate
+#declare sidx
+#declare dt_semi = 1.05946309436
+#declare note_key$(11), octave = 0
+#declare v$, ch$
+#declare audioidx, seqstate
+#declare notemap(6), duration
+
+
+'-------
+.defines
+'-------
+#define STATE_MAIN = 0
+#define STATE_FSTART = 1
+#define STATE_FPLAYBACK = 2
+#define STATE_FLOOP = 3
+#define STATE_FEND = 4
+
+#define FRM_START    = 0
+#define FRM_PLAYBACK = 1
+#define FRM_LOOP     = 2
+#define FRM_END      = 3
+
+#define WAV_SIZE = $d246
+
+#struct SAMPLE name$, looping, start%, playback, loop, finish, srate
+
+#define SEQ_MAIN = 0
+#define SEQ_SELECT_SAMPLE = 1
+#define TIMEGAP = .05
+
+
+'----
+.init
+'----
+  state$(0) = "main:   "
+  state$(1) = "fstart: "
+  state$(2) = "fplaybk:"
+  state$(3) = "floop:  "
+  state$(4) = "fend:   "
+
+  old_frame(FRM_START) = -1
+  old_frame(FRM_PLAYBACK) = -1
+  old_frame(FRM_LOOP) = -1
+  old_frame(FRM_END) = -1
+
+  SAMPLE sample(5) = [ {x5F}
+    [ "get", 1, 0,     1631,  2091,  3700, $19e4 ], {x5F}
+    [ "to",  0, 3700,  0,     0,     5710, $1ca0 ], {x5F}
+    [ "the", 0, 5800,  0,     0,     8000, $1c64 ], {x5F}
+    [ "cho", 1, 8601,  11334, 12100, 14200, $1c3c ], {x5F}
+    [ "per", 1, 14301, 16830, 17796, 26914, $1c6e ], {x5F}
+    [ "all", 0, 0,     0,     0,     26914, $19e4 ] {x5F}
+  ]
+
+  note_key$(0)  = "a"  ' c
+  note_key$(1)  = "w"  ' c#
+  note_key$(2)  = "s"  ' d
+  note_key$(3)  = "e"  ' d#
+  note_key$(4)  = "d"  ' e
+  note_key$(5)  = "f"  ' f
+  note_key$(6)  = "t"  ' f#
+  note_key$(7)  = "g"  ' g
+  note_key$(8)  = "y"  ' g#
+  note_key$(9)  = "h"  ' a
+  note_key$(10) = "u"  ' a#
+  note_key$(11) = "j"  ' b
+
+  notemap(0) = 0  ' c
+  notemap(1) = 2  ' d
+  notemap(2) = 4  ' e
+  notemap(3) = 5  ' f
+  notemap(4) = 7  ' g
+  notemap(5) = 9  ' a
+  notemap(6) = 11 ' b
+  
+
+'----
+.main
+'----
+  bload "chopper16k.raw",p($50000)
+
+  gosub sequencer
+
+  gosub piano_mode
+
+  gosub init_screen
+
+  gosub draw_audio
+
+  mouse on, 1, 0
+  dmode 0, 1, 0, 0, 0
+
+  gosub get_input
+
+  screen close
+  mouse off
+  end
+
+
+'---------
+.sequencer
+'---------
+  print chr$(147);
+
+  duration = 4  ' default to quarter note
+
+  do while 1
+    input "{x13}";v$
+
+    seqstate = SEQ_MAIN
+
+    ' parse and play the audio string
+    for audioidx = 1 to len(v$)
+      ch$ = mid$(v$, audioidx, 1)
+
+      if seqstate = SEQ_MAIN then begin
+
+        if ch$ = "%" then seqstate = SEQ_SELECT_SAMPLE
+
+        if ch$ >= "a" and ch$ <= "g" then begin
+          if ch$ >= "c" then k = asc(ch$) - asc("c")
+          if ch$ = "a" then k = 5
+          if ch$ = "b" then k = 6
+          srate = sample_srate(sidx)
+          srate = srate * dt_semi ^ (notemap(k) + octave * 12)
+          gosub play_with_srate
+          sleep TIMEGAP * duration
+          if sample_looping(sidx) then gosub end_audio_looping
+        bend
+
+        if ch$ = "s" then duration = 1
+        if ch$ = "i" then duration = 2
+        if ch$ = "q" then duration = 4
+        if ch$ = "h" then duration = 8
+        if ch$ = "w" then duration = 16
+
+        if ch$ = "r" then sleep TIMEGAP * duration
+
+      bend : goto skip_seq
+
+      if seqstate = SEQ_SELECT_SAMPLE then begin
+        sidx = val(ch$)
+        print "sidx=";sidx;"(";ch$;")"
+        seqstate = SEQ_MAIN
+      bend
+
+.skip_seq
+    next audioidx
+  loop
+
+  return
+
+
+'----------
+.piano_mode
+'----------
+  do while 1
+    get key a$
+    if a$ >= "1" and a$ <= "6" then sidx = asc(a$) - asc("1") : gosub play_with_info
+    if a$ = "," then sample_srate(sidx) = sample_srate(sidx) - 1 : gosub play_with_info
+    if a$ = "." then sample_srate(sidx) = sample_srate(sidx) + 1 : gosub play_with_info
+    if a$ = "<" then sample_srate(sidx) = sample_srate(sidx) - 50 : gosub play_with_info
+    if a$ = ">" then sample_srate(sidx) = sample_srate(sidx) + 50 : gosub play_with_info
+    
+    if a$ = ";" then begin
+      octave = octave - 1
+      print "octave =";octave
+    bend
+
+    if a$ = ":" then begin
+      octave = octave + 1
+      print "octave =";octave
+    bend
+
+    if a$ = "@" then begin
+      octave = octave - .02
+      print "octave =";octave
+    bend
+
+    if a$ = "*" then begin
+      octave = octave + .2
+      print "octave =";octave
+    bend
+
+    gosub check_notes
+    if a$ = "x" then end
+  loop
+  return
+
+
+'-----------
+.check_notes
+'-----------
+  for k = 0 to 11
+    if a$ = note_key$(k) then begin
+      srate = sample_srate(sidx)
+      srate = srate * dt_semi ^ (k + octave * 12)
+      gosub play_with_srate
+    bend
+  next k
+  return
+
+
+'--------------
+.play_with_info
+'--------------
+  print "sample#";mid$(str$(sidx),2);" @ ";hex$(sample_srate(sidx))
+  gosub play_sample_audio
+  return
+
+
+'--------------
+.play_with_srate
+'--------------
+  print "sample#";mid$(str$(sidx),2);" @ ";hex$(srate)
+  gosub play_var_srate
+  return
+
+
+'---------
+.draw_info
+'---------
+  a$ = state$(state) + "fstart =" {x5F}
+    + str$(frame(FRM_START)) {x5F}
+    + ", fplaybk =" + str$(frame(FRM_PLAYBACK)) {x5F}
+    + ", floop = " + str$(frame(FRM_LOOP)) {x5F}
+    + ", fend =" + str$(frame(FRM_END))
+
+  xpos = 0 : ypos = 0
+  gosub draw_text
+
+  if state >= STATE_FSTART and state <= STATE_FEND then begin
+
+    v = wpeek($50000 + frame(state - 1) * 2)
+
+    if v and 32768 then v = v - 65535
+    a$ = "sample = " + str$(v)
+
+    xpos = 0 : ypos = 1
+    gosub draw_text
+
+    if old_frame(state-1) <> -1 then begin
+      line old_frame(state-1), 16, old_frame(state-1), 399
+    bend
+
+    t = frame(state-1) * 640 / (WAV_SIZE / 2)
+    line t, 16, t, 399
+    old_frame(state-1) = t
+
+  bend
+
+  return
+
+
+'---------
+.get_input
+'---------
+  do while 1
+    gosub draw_info
+
+    get key a$
+    if a$ = "1" then state = STATE_FSTART
+    if a$ = "2" then state = STATE_FPLAYBACK
+    if a$ = "3" then state = STATE_FLOOP
+    if a$ = "4" then state = STATE_FEND
+    if a$ = "p" then gosub play_audio 
+    if a$ = ">" then gosub big_incr
+    if a$ = "<" then gosub big_decr
+    if a$ = "." then gosub little_incr
+    if a$ = "," then gosub little_decr
+    if a$ = "x" then exit
+  loop
+  return
+
+
+'--------
+.big_incr
+'--------
+  if state = STATE_MAIN then return
+  frame(state-1) = frame(state-1) + 100
+  if frame(state-1) > (WAV_SIZE / 2) then frame(state-1) = WAV_SIZE/2-1
+  return
+
+
+'--------
+.big_decr
+'--------
+  if state = STATE_MAIN then return
+  frame(state-1) = frame(state-1) - 100
+  if frame(state-1) < 0 then frame(state-1) = 0
+  return
+
+
+'-----------
+.little_incr
+'-----------
+  if state = STATE_MAIN then return
+  frame(state-1) = frame(state-1) + 1
+  if frame(state-1) > (WAV_SIZE / 2) then frame(state-1) = WAV_SIZE/2-1
+  return
+
+
+'-----------
+.little_decr
+'-----------
+  if state = STATE_MAIN then return
+  frame(state-1) = frame(state-1) - 1
+  if frame(state-1) < 0 then frame(state-1) = 0
+  return
+
+
+'---------
+.draw_text
+'---------
+  ' clear prior text
+  char xpos, ypos*8, 1, 1, 2, chr$(2)+"                                                                     "
+
+  char xpos, ypos*8, 1, 1, 2, a$
+
+  return
+
+
+'-----------
+.init_screen
+'-----------
+  screen 0, 640, 400, 1
+  pen 1
+  return
+
+
+'----------
+.draw_audio
+'----------
+  t = 0
+  oldx = 0
+  oldy = 200
+
+  dt = 640 / 26915
+  for k = $50000 to $5d246 step 2
+    v = wpeek(k)
+    if v and 32768 then v = v - 65535
+
+    'print v
+    'get key a$
+
+    v = v * 200 / 32768 + 200
+    line oldx, oldy, t, v
+
+    oldx = t
+    oldy = v
+
+    t = (k - $50000) / 2 * 640 / 26915
+  next k
+
+  return
+
+
+'---------------------
+.play_audio_from_frame
+'---------------------
+  fstart = frame(FRM_START)
+  fplayback = frame(FRM_PLAYBACK)
+  floop = frame(FRM_LOOP)
+  fend = frame(FRM_END)
+  looping = 1
+  srate = $19e4
+
+  gosub play_audio
+  return
+
+
+'-----------------
+.play_sample_audio
+'-----------------
+  srate = sample_srate(sidx)
+
+  gosub play_var_srate
+  return
+
+
+'--------------
+.play_var_srate
+'--------------
+  fstart = sample_start%(sidx)
+  fplayback = sample_playback(sidx)
+  floop = sample_loop(sidx)
+  fend = sample_finish(sidx)
+  looping = sample_looping(sidx)
+
+  gosub play_audio
+  return
+
+
+'----------
+.play_audio
+'----------
+  ' switch off digi channel 0
+  poke $d720, 0
+
+  ' enable audio dma
+  setbit $d711, 7
+
+  ' sample starts at $5.0000
+  v = fplayback * 2
+  poke $d721, v and 255
+  poke $d722, v / 256
+  poke $d723, $05
+
+  ' set playhead to beginning
+  v = fstart * 2
+  poke $d72a, v and 255
+  poke $d72b, v / 256
+  poke $d72c, $05
+
+  ' end (loop-point) of sample
+  if looping then v = floop * 2 : else v = fend * 2
+  wpoke $d727, v
+
+  ' set digi ch0 l/r volumes
+  poke $d71c,$22 : poke $d729, $22
+
+  ' sample_rate = (16000 * 2^24) / (40.5 * 10^6) = 6628 = $19E4
+
+  ' sample rate 16kHz
+  poke $d724, srate and 255
+  poke $d725, (srate / 256) and 255
+  poke $d726, (srate / 65536) and 255
+
+  ' play unsigned 16-bit sound with looping
+  k = $80 + $03
+  if looping then k = k + $40
+  poke $d720, k
+
+  return
+
+
+'-----------------
+.end_audio_looping
+'-----------------
+
+  ' switch it off!
+  ' --------------
+
+  ' end (loop-point) of sample
+  v = fend * 2
+  wpoke $d727, v
+
+  ' play unsigned 16-bit sound without looping
+  poke $d720, $80 + $00 + $03
+
+  return
+ÿ
