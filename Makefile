@@ -4,6 +4,8 @@ all:
 	c1541 -attach "C:\Users\phuon\AppData\Roaming\xemu-lgb\mega65\hdos\11.D81" -read chabi.p,s
 	c1541 -attach "C:\Users\phuon\AppData\Roaming\xemu-lgb\mega65\hdos\11.D81" -read mm.p,s
 	c1541 -attach "C:\Users\phuon\AppData\Roaming\xemu-lgb\mega65\hdos\11.D81" -read monkey.p,s
+	c1541 -attach "C:\Users\phuon\AppData\Roaming\xemu-lgb\mega65\hdos\11.D81" -read monkey monkey.prg
+	petcat -65 -o monkey.bas -- monkey.prg
 
 tod81:
 	c1541 -attach "C:\Users\gurcei\AppData\Roaming\xemu-lgb\mega65\hdos\11.D81" -delete melody.el -write melody.el melody.el,s
