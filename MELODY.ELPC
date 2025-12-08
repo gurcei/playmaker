@@ -42,6 +42,7 @@ trap runstop_trapper
 #declare tmpo% = 12
 
 #declare esc_flag% = 0
+#declare chk$
 
 #struct ENVTYPE name$, attack, decay, sustain, release, waveform, pw
 
@@ -487,6 +488,7 @@ color 5
   chunk_idx = tmp
   return
 
+
 .save_as_text
 '------------
   input "save (as text) name: ";key$
@@ -495,13 +497,56 @@ color 5
   delete (key$)
     
   dopen #2,(key$),w,u8
-  for chunk_idx = 0 to chunk_max
+
+  print #2, "rem *** init music vars ***"
+  gosub get_chunk_cnt
+
+  chk$ = mid$(str$(chunk_cnt),2)
+
+  print #2, "dim v1$(";chk$;"):";
+  print #2, "dim v2$(";chk$;"):";
+  print #2, "dim v3$(";chk$;"):";
+  print #2, "dim v4$(";chk$;"):";
+  print #2, "dim v5$(";chk$;"):";
+  print #2, "dim v6$(";chk$;")"
+
+  print #2, "t=0:rem music chunk index"
+  print #2, "tt=0:rem bar index"
+  print #2, "dim m(";mid$(str$(seqcnt),2);")"
+
+  k = seq_offs
+  for k = 0 to seqcnt
+    print #2, "m(";mid$(str$(k),2);")=";str$(seq_chunk(k));
+    if mod(k+1,8) = 0 or k = seqcnt then begin
+      print #2, ""
+    bend:else begin
+      print #2, ":";
+    bend
+  next k
+
+  for chunk_idx = 0 to chunk_cnt-1
     for vidx=0 to 5
       print #2, "v";chr$(49+vidx);"$(";mid$(str$(chunk_idx),2);")=";
       print #2, chr$(34);v$(vidx, chunk_idx);chr$(34)
     next vidx  
     print #2, ""
   next chunk_idx
+
+  for k = 0 to 9
+    print #2, "envelope";k;",";envs_attack(k);",";envs_decay(k);",";
+    print #2, envs_sustain(k);",";envs_release(k)
+  next k
+
+  print #2, "return"
+
+  print #2, "rem *** poll for playing of next song chunk"
+  print #2, "if rplay(1) then return"
+  print #2, "t = m(tt) : rem music_chunk_index = map_bar_to_chunk(bar_index)"
+  print #2, "play v1$(t), v2$(t), v3$(t), v4$(t), v5$(t), v6$(t)"
+  print #2, "tt=tt+1"
+  print #2, "if m(tt) = -1 then tt = 0"
+  print #2, "return"
+
   dclose #2
 
   chunk_idx = 0
