@@ -59,6 +59,44 @@ ENVTYPE envs(9) = [ {x5F}
   [ "Xylophone",   0,  9,  0,  0,  0,    0 ]  {x5F}
 ]
 
+#declare cur_octave, prev_octave, cur_v$, trans_v$, note$(12)
+#declare trans_dir, ch$, transpose_state, cur_flat_sharp
+#declare error$, error, cur_note$, verbose, note_idx, new_octave_flag
+#declare octave_tweaked, prev_trans_octave
+
+verbose = 0
+
+'-------
+.defines
+'-------
+#define TSTATE_MAIN   = 1
+#define TSTATE_OCTAVE = 2
+
+#define NOTE_FLAT   = -1
+#define NOTE_NORMAL = 0
+#define NOTE_SHARP  = 1
+
+#define TRANS_UP = 0
+#define TRANS_DOWN = 1
+
+#define ERR_INVALID_OCTAVE = 1
+#define ERR_MISSING_OCTAVE = 2
+#define ERR_OCTAVE_OVERFLOW = 3
+#define ERR_OCTAVE_UNDERFLOW = 4
+
+note$(0) = "c"
+note$(1) = "#c"
+note$(2) = "d"
+note$(3) = "#d"
+note$(4) = "e"
+note$(5) = "f"
+note$(6) = "#f"
+note$(7) = "g"
+note$(8) = "#g"
+note$(9) = "a"
+note$(10) = "#a"
+note$(11) = "b"
+
 #define DIR_NONE = 0
 #define DIR_UP   = 1
 #define DIR_DOWN = 2
@@ -650,6 +688,7 @@ color 5
     v$(cursor_y, chunk_idx) = v1$
   bend
 
+
   gosub check_valid_key
   return
 
@@ -672,10 +711,52 @@ color 5
 
   if key$="," then delta = -1 : gosub transpose_octave
   if key$="." then delta = 1  : gosub transpose_octave
+
   if key$="i" then gosub insert_chunk
+
+  if key$=KEY_UP then gosub increment_semitone
+  if key$=KEY_DOWN then gosub decrement_semitone
+
 
   key$ = ""
   return
+
+
+.increment_semitone
+'------------------
+  cur_v$ = v$(cursor_y, chunk_idx)
+
+  trans_dir = TRANS_UP
+  gosub transpose
+
+  if error <> 0 then begin
+    color 2
+    cursor 0,49:print error$;:color 5
+    sleep 1
+    return
+  bend
+
+  v$(cursor_y, chunk_idx) = trans_v$
+  return
+
+
+.decrement_semitone
+'------------------
+  cur_v$ = v$(cursor_y, chunk_idx)
+
+  trans_dir = TRANS_DOWN
+  gosub transpose
+
+  if error <> 0 then begin
+    color 2
+    cursor 0,49:print error$;:color 5
+    sleep 1
+    return
+  bend
+
+  v$(cursor_y, chunk_idx) = trans_v$
+  return
+
 
 .copy_all_voices_to_clipboard
 '----------------------------
@@ -928,7 +1009,7 @@ color 5
 
 .show_cell
 '---------
-  if srow=row and scol = col and ffocus=0 then print KEY_REV_ON;:else print KEY_REV_OFF;
+  if (srow=row) and (scol = col) and ffocus=0 then print KEY_REV_ON;:else print KEY_REV_OFF;
 
   if col = 0 then begin
     print v$;KEY_TAB;"{x92}";
@@ -1142,6 +1223,8 @@ color 5
     if v > 4095 then v = 4095
     if v < 0 then v = 0
     envs_pw(srow) = v
+    row = srow
+    gosub set_env
     return
   bend
 

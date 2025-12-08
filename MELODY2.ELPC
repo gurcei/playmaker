@@ -1,0 +1,167 @@
+' continuation of 'melody.el' file...
+
+'----------
+.state_main
+'----------
+  handled = 0
+
+  if ch$ = "o" then handled = 1 : transpose_state = TSTATE_OCTAVE
+  if instr("#$", ch$) then handled = 1 : gosub state_sharp_flat
+  if instr("abcdefg", ch$) then handled = 1 : gosub state_note
+
+  if handled = 0 then begin
+    trans_v$ = trans_v$ + ch$
+  bend
+  
+  if verbose then print "trans_v$ = ";trans_v$
+
+  return
+
+
+'----------------
+.state_sharp_flat
+'----------------
+  if ch$ = "#" then cur_flat_sharp = NOTE_SHARP
+  if ch$ = "$" then cur_flat_sharp = NOTE_FLAT
+  return
+
+
+'----------
+.state_note
+'----------
+  if verbose then print "STATE_NOTE:"
+
+  if cur_octave = -1 then begin
+    error$="no explicit octave found before note"
+    error=ERR_MISSING_OCTAVE
+    return
+  bend
+
+  cur_note$ = ""
+  octave_tweaked = 0
+  if cur_flat_sharp = NOTE_SHARP then cur_note$ = "#"
+  if cur_flat_sharp = NOTE_FLAT then cur_note$ = "$"
+  cur_note$ = cur_note$ + ch$
+
+  gosub get_cur_note_idx
+
+  if verbose then print "note_idx=";note_idx
+
+  if trans_dir = TRANS_UP then begin
+    note_idx = note_idx + 1
+
+    if note_idx > 11 then begin
+      octave_tweaked = 1
+      prev_octave = cur_octave
+      cur_octave = cur_octave + 1
+      new_octave_flag = 1
+      note_idx = 0
+
+      if verbose then print "prev_oct=";prev_octave;", cur_oct=";cur_octave
+
+      if cur_octave > 6 then begin
+        error$="octave overflow"
+        error=ERR_OCTAVE_OVERFLOW
+        return
+      bend
+    bend
+  bend
+
+  if trans_dir = TRANS_DOWN then begin
+    note_idx = note_idx - 1
+    if note_idx < 0 then begin
+      octave_tweaked = 1
+      prev_octave = cur_octave
+      cur_octave = cur_octave - 1
+      new_octave_flag = 1
+      note_idx = 11
+
+      if verbose then print "prev_oct=";prev_octave;", cur_oct=";cur_octave
+
+      if cur_octave < 0 then begin
+        error$="octave underflow"
+        error=ERR_OCTAVE_UNDERFLOW
+        return
+      bend
+    bend
+  bend
+
+  if cur_octave <> prev_trans_octave or prev_octave = -1 then begin
+    trans_v$ = trans_v$ + "o" + mid$(str$(cur_octave), 2)
+    prev_trans_octave = cur_octave
+  bend
+    
+  if verbose then print "prev_trans_octave = ";prev_trans_octave
+
+  if prev_octave <> -1 and octave_tweaked then begin
+    ' revert to previous octave, as following notes might not suit tweaked octave
+    tmp = cur_octave
+    cur_octave = prev_octave
+    prev_octave = tmp
+    if verbose then print "SWAP: prev_oct=";prev_octave;", cur_oct=";cur_octave
+  bend
+  new_octave_flag = 0
+
+  prev_octave = cur_octave
+
+  cur_note$ = note$(note_idx)
+  trans_v$ = trans_v$ + cur_note$
+
+  cur_flat_sharp = NOTE_NORMAL
+
+  return
+
+
+'----------------
+.get_cur_note_idx
+'----------------
+  for note_idx = 0 to 11
+    if note$(note_idx) = cur_note$ then return
+  next note_idx
+
+  note_idx = -1  ' not found
+
+  return
+
+
+'------------
+.state_octave
+'------------
+  if ch$ < "0" or ch$ > "6" then begin
+    error$="invalid octave value"
+    error=ERR_INVALID_OCTAVE
+    return
+  bend
+
+  cur_octave = val(ch$)
+  new_octave_flag = 1
+
+  transpose_state = TSTATE_MAIN
+  return
+
+
+'---------
+.transpose
+'---------
+' tested in file: "transpose.el"
+
+  cur_octave = -1
+  prev_octave = -1
+  prev_trans_octave = -1
+  trans_v$ = ""
+  transpose_state = TSTATE_MAIN
+  error = 0
+  new_octave_flag = 0
+
+  for k = 1 to len(cur_v$)
+    ch$ = mid$(cur_v$, k, 1)
+
+    if verbose then print "transpose_state = ";transpose_state;
+    if verbose then print ", ch$=";ch$
+
+    on transpose_state gosub state_main, state_octave
+    if error <> 0 then k = len(cur_v$)  ' bail early
+  next k
+
+  return
+ÿ
