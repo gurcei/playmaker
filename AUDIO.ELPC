@@ -14,6 +14,7 @@
 #declare v$, ch$
 #declare audioidx, seqstate
 #declare notemap(6), sharpnotemap(6), duration, sharp_flag, dotted_flag
+#declare mytempo, dt_digi, is_digi_playing, digi_start, time_duration
 
 
 '-------
@@ -57,7 +58,7 @@
     [ "get", 1, 0,     1631,  2091,  3700, $19e4 ], {x5F}
     [ "to",  0, 3700,  0,     0,     5710, $1ca0 ], {x5F}
     [ "the", 0, 5800,  0,     0,     8000, $1c64 ], {x5F}
-    [ "cho", 1, 8601,  11334, 12100, 14200, $1c3c ], {x5F}
+    [ "cho", 1, 8701,  11334, 12100, 14200, $1c3c ], {x5F}
     [ "per", 1, 14301, 16830, 17796, 26914, $1c6e ], {x5F}
     [ "all", 0, 0,     0,     0,     26914, $19e4 ] {x5F}
   ]
@@ -120,75 +121,110 @@
 '---------
   print chr$(147);
 
+  mytempo = 20
+
+  ' whole note duration = 24 / tempovalue
+  ' sixteenth note = 24 / tempovalue / 16
+  dt_digi = 24 / mytempo / 16
+
   do while 1
     duration = 4  ' default to quarter note
     sharp_flag = 0
     dotted_flag = 0
     octave = 0
+    audioidx = 1
+    is_digi_playing = 0
     
     input "{x13}";v$
 
     seqstate = SEQ_MAIN
 
-    ' parse and play the audio string
-    for audioidx = 1 to len(v$)
-      ch$ = mid$(v$, audioidx, 1)
+    do while audioidx <> -1
+      gosub poll_digis
+    loop
 
-      if seqstate = SEQ_MAIN then begin
+  loop
 
-        if ch$ = "%" then seqstate = SEQ_SELECT_SAMPLE
+  return
 
-        if ch$ = "#" then sharp_flag = 1
-        if ch$ = "." then dotted_flag = 1
 
-        if ch$ = "-" then octave = octave - 1
-        if ch$ = "+" then octave = octave + 1
+'----------
+.poll_digis
+'----------
+  ' parse and play the audio string
 
-        if ch$ >= "a" and ch$ <= "g" then begin
-          if ch$ >= "c" then k = asc(ch$) - asc("c")
-          if ch$ = "a" then k = 5
-          if ch$ = "b" then k = 6
-          srate = sample_srate(sidx)
+  if is_digi_playing then begin
+    ' print "ti-digi_start = ";ti-digi_start
+    ' print "time_duration = ";time_duration
 
-          if sharp_flag then begin
-            srate = srate * dt_semi ^ (sharpnotemap(k) + octave * 12)
-          bend : else begin
-            srate = srate * dt_semi ^ (notemap(k) + octave * 12)
-          bend
+    if (ti - digi_start) >= time_duration then begin
+      if sample_looping(sidx) then gosub end_audio_looping
+      is_digi_playing = 0
+    bend : else begin
+      return
+    bend
+  bend
 
-          sharp_flag = 0
+  if audioidx > len(v$) then audioidx = -1 : return
 
-          gosub play_with_srate
+  ch$ = mid$(v$, audioidx, 1)
 
-          if dotted_flag then begin
-            sleep TIMEGAP * duration * 1.5
-          bend : else begin
-            sleep TIMEGAP * duration
-          bend
-          dotted_flag = 0
+  if seqstate = SEQ_MAIN then begin
 
-          if sample_looping(sidx) then gosub end_audio_looping
-        bend
+    if ch$ = "%" then seqstate = SEQ_SELECT_SAMPLE
 
-        if ch$ = "s" then duration = 1
-        if ch$ = "i" then duration = 2
-        if ch$ = "q" then duration = 4
-        if ch$ = "h" then duration = 8
-        if ch$ = "w" then duration = 16
+    if ch$ = "#" then sharp_flag = 1
+    if ch$ = "." then dotted_flag = 1
 
-        if ch$ = "r" then sleep TIMEGAP * duration
+    if ch$ = "-" then octave = octave - 1
+    if ch$ = "+" then octave = octave + 1
 
-      bend : goto skip_seq
+    if ch$ >= "a" and ch$ <= "g" then begin
+      if ch$ >= "c" then k = asc(ch$) - asc("c")
+      if ch$ = "a" then k = 5
+      if ch$ = "b" then k = 6
+      srate = sample_srate(sidx)
 
-      if seqstate = SEQ_SELECT_SAMPLE then begin
-        sidx = val(ch$)
-        ' print "sidx=";sidx;"(";ch$;")"
-        seqstate = SEQ_MAIN
+      if sharp_flag then begin
+        srate = srate * dt_semi ^ (sharpnotemap(k) + octave * 12)
+      bend : else begin
+        srate = srate * dt_semi ^ (notemap(k) + octave * 12)
       bend
 
+      sharp_flag = 0
+
+      gosub play_with_srate
+      digi_start = ti
+      is_digi_playing = 1
+
+      if dotted_flag then begin
+        time_duration = dt_digi * duration * 1.5
+      bend : else begin
+        time_duration =  dt_digi * duration
+      bend
+
+      dotted_flag = 0
+
+    bend
+
+    if ch$ = "s" then duration = 1
+    if ch$ = "i" then duration = 2
+    if ch$ = "q" then duration = 4
+    if ch$ = "h" then duration = 8
+    if ch$ = "w" then duration = 16
+
+    if ch$ = "r" then sleep TIMEGAP * duration
+
+  bend : goto skip_seq
+
+  if seqstate = SEQ_SELECT_SAMPLE then begin
+    sidx = val(ch$)
+    ' print "sidx=";sidx;"(";ch$;")"
+    seqstate = SEQ_MAIN
+  bend
+
 .skip_seq
-    next audioidx
-  loop
+  audioidx = audioidx + 1
 
   return
 
