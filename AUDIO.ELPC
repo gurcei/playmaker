@@ -8,14 +8,18 @@
 #declare state, state$(4)
 #declare xpos, ypos, frame(4), old_frame(4)
 #declare fstart, fplayback, floop, fend, looping, srate
-#declare sidx
 #declare dt_semi = 1.05946309436
-#declare note_key$(11), octave = 0
-#declare v$, ch$
-#declare audioidx, seqstate
-#declare notemap(6), sharpnotemap(6), duration, sharp_flag, dotted_flag
-#declare mytempo, dt_digi, is_digi_playing, digi_start, time_duration
-#declare is_rest
+#declare note_key$(11)
+#declare ch$
+#declare notemap(6), sharpnotemap(6), mytempo, dt_digi
+
+#declare v$(3), sidx(3)
+#declare audioidx(3), seqstate(3)
+#declare duration(3), sharp_flag(3), dotted_flag(3)
+#declare is_digi_playing(3), time_duration(3)
+#declare is_rest(3), octave(3)
+
+#declare dchan, doffs
 
 
 '-------
@@ -98,10 +102,14 @@
   tempo 20
   envelope 6, 0, 9, 0, 0
   envelope 7, 0, 9, 9, 0
-  play "t6o1 iaaaaaa aaaaaa l",,,"t7io2ao3egao4co3gaegdeg l"
+  ' play "t6o1 iaaaaaa aaaaaa l",,,"t7io2ao3egao4co3gaegdeg l"
 
-  ' v$ = "i%0e%1e%2e%3e%4e %2e%3e%4e %2e%3e%4e %2e"
-  v$ = "i -%0a +%1e %2g %3a +%4c -%2g %3a %4e %2g %3d %4e %2g"
+  v$(0) = "i -%0a +%1e %2g %3a +%4c -%2g %3a %4e %2g %3d %4e %2g"
+  v$(1) = "-i%0a%1a%2a%3a%4a %2a%3a%4a %2a%3a%4a %2a"
+
+  ' enable audio dma
+  setbit $d711, 7
+
 
 '----
 .main
@@ -138,22 +146,28 @@
   dt_digi = 24 / mytempo / 16
 
   do while 1
-    duration = 4  ' default to quarter note
-    sharp_flag = 0
-    dotted_flag = 0
-    octave = 0
-    audioidx = 1
-    is_digi_playing = 0
-    is_rest = 0
 
-    print "{x93}? ";v$    
-    input "{x13}";v$
+    for k = 0 to 3
+      print "? ";v$(k)    
+      input "{x91}";v$(k)
+    next k
 
-    seqstate = SEQ_MAIN
-    time_duration = ti
+    for k = 0 to 3
+      audioidx(k) = 1
+      is_digi_playing(k) = 0
+      is_rest(k) = 0
+      duration(k) = 4  ' default to quarter note
+      sharp_flag(k) = 0
+      dotted_flag(k) = 0
+      octave(k) = 0
+      seqstate(k) = SEQ_MAIN
+      time_duration(k) = ti
+    next k
 
-    do while audioidx <> -1
-      gosub poll_digis
+    do while audioidx(0) <> -1
+      for dchan = 0 to 3
+        gosub poll_digis
+      next dchan
     loop
 
   loop
@@ -166,86 +180,93 @@
 '----------
   ' parse and play the audio string
 
-  if is_digi_playing then begin
-    ' print "ti-digi_start = ";ti-digi_start
-    ' print "time_duration = ";time_duration
-
-    if ti >= time_duration then begin
-      if not is_rest and sample_looping(sidx) then gosub end_audio_looping
-      is_digi_playing = 0
-      is_rest = 0
+  if is_digi_playing(dchan) then begin
+    if ti >= time_duration(dchan) then begin
+      print "got here!"
+      if not is_rest(dchan) and sample_looping(sidx(dchan)) then gosub end_audio_looping
+      is_digi_playing(dchan) = 0
+      is_rest(dchan) = 0
     bend : else begin
       return
     bend
   bend
 
-  if audioidx > len(v$) then audioidx = -1 : return
+  if audioidx(dchan) > len(v$(dchan)) then audioidx(dchan) = -1 : return
 
-  ch$ = mid$(v$, audioidx, 1)
+  if audioidx(dchan) = -1 then return
 
-  if seqstate = SEQ_MAIN then begin
+  ch$ = mid$(v$(dchan), audioidx(dchan), 1)
+  print "dchan=";dchan;" : v$(dchan) = ";v$(dchan)
+  'print "audioidx=";audioidx(dchan);" : ch$=";ch$
 
-    if ch$ = "%" then seqstate = SEQ_SELECT_SAMPLE
+  if seqstate(dchan) = SEQ_MAIN then begin
 
-    if ch$ = "#" then sharp_flag = 1
-    if ch$ = "." then dotted_flag = 1
+    if ch$ = "%" then seqstate(dchan) = SEQ_SELECT_SAMPLE
 
-    if ch$ = "-" then octave = octave - 1
-    if ch$ = "+" then octave = octave + 1
+    if ch$ = "#" then sharp_flag(dchan) = 1
+    if ch$ = "." then dotted_flag(dchan) = 1
+
+    if ch$ = "-" then octave(dchan) = octave(dchan) - 1
+    if ch$ = "+" then octave(dchan) = octave(dchan) + 1
 
     if ch$ >= "a" and ch$ <= "g" then begin
       if ch$ >= "c" then k = asc(ch$) - asc("c")
       if ch$ = "a" then k = 5
       if ch$ = "b" then k = 6
-      srate = sample_srate(sidx)
+      srate = sample_srate(sidx(dchan))
 
-      if sharp_flag then begin
-        srate = srate * dt_semi ^ (sharpnotemap(k) + (octave - PITCH_BEND) * 12)
+      if sharp_flag(dchan) then begin
+        srate = srate * dt_semi ^ (sharpnotemap(k) + (octave(dchan) - PITCH_BEND) * 12)
       bend : else begin
-        srate = srate * dt_semi ^ (notemap(k) + (octave - PITCH_BEND) * 12)
+        srate = srate * dt_semi ^ (notemap(k) + (octave(dchan) - PITCH_BEND) * 12)
       bend
 
-      sharp_flag = 0
+      sharp_flag(dchan) = 0
 
-      digi_start = ti
-      is_digi_playing = 1
+      is_digi_playing(dchan) = 1
       gosub play_with_srate
 
-      if dotted_flag then begin
-        time_duration = time_duration + dt_digi * duration * 1.5
+      if dotted_flag(dchan) then begin
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan) * 1.5
       bend : else begin
-        time_duration = time_duration + dt_digi * duration
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan)
       bend
+      print "time_duration=";time_duration(dchan)
 
-      dotted_flag = 0
+      dotted_flag(dchan) = 0
 
     bend
 
-    if ch$ = "s" then duration = 1
-    if ch$ = "i" then duration = 2
-    if ch$ = "q" then duration = 4
-    if ch$ = "h" then duration = 8
-    if ch$ = "w" then duration = 16
+    if ch$ = "s" then duration(dchan) = 1
+    if ch$ = "i" then duration(dchan) = 2
+    if ch$ = "q" then duration(dchan) = 4
+    if ch$ = "h" then duration(dchan) = 8
+    if ch$ = "w" then duration(dchan) = 16
 
     if ch$ = "r" then begin
-      is_rest = 1
-      if dotted_flag then begin
-        time_duration = time_duration + dt_digi * duration * 1.5
+      is_rest(dchan) = 1
+      if dotted_flag(dchan) then begin
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan) * 1.5
       bend : else begin
-        time_duration = time_duration + dt_digi * duration
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan)
       bend
+      is_digi_playing(dchan) = 1
+      sharp_flag(dchan) = 0
+      dotted_flag(dchan) = 0
     bend
 
   bend : goto skip_seq
 
-  if seqstate = SEQ_SELECT_SAMPLE then begin
-    sidx = val(ch$)
+  if seqstate(dchan) = SEQ_SELECT_SAMPLE then begin
+    sidx(dchan) = val(ch$)
     ' print "sidx=";sidx;"(";ch$;")"
-    seqstate = SEQ_MAIN
+    seqstate(dchan) = SEQ_MAIN
   bend
 
 .skip_seq
-  audioidx = audioidx + 1
+  audioidx(dchan) = audioidx(dchan) + 1
+
+  goto poll_digis  ' see if we're in a position to parse more of the string...
 
   return
 
@@ -480,11 +501,11 @@
 '--------------
 .play_var_srate
 '--------------
-  fstart = sample_start%(sidx)
-  fplayback = sample_playback(sidx)
-  floop = sample_loop(sidx)
-  fend = sample_finish(sidx)
-  looping = sample_looping(sidx)
+  fstart = sample_start%(sidx(dchan))
+  fplayback = sample_playback(sidx(dchan))
+  floop = sample_loop(sidx(dchan))
+  fend = sample_finish(sidx(dchan))
+  looping = sample_looping(sidx(dchan))
 
   gosub play_audio
   return
@@ -493,42 +514,42 @@
 '----------
 .play_audio
 '----------
-  ' switch off digi channel 0
-  poke $d720, 0
+  doffs = dchan * $10
 
-  ' enable audio dma
-  setbit $d711, 7
+  ' switch off digi channel 0
+  poke $d720 + doffs, 0
 
   ' sample starts at $5.0000
   v = fplayback * 2
-  poke $d721, v and 255
-  poke $d722, v / 256
-  poke $d723, $05
+  poke $d721 + doffs, v and 255
+  poke $d722 + doffs, v / 256
+  poke $d723 + doffs, $05
 
   ' set playhead to beginning
   v = fstart * 2
-  poke $d72a, v and 255
-  poke $d72b, v / 256
-  poke $d72c, $05
+  poke $d72a + doffs, v and 255
+  poke $d72b + doffs, v / 256
+  poke $d72c + doffs, $05
 
   ' end (loop-point) of sample
   if looping then v = floop * 2 : else v = fend * 2
-  wpoke $d727, v
+  wpoke $d727 + doffs, v
 
   ' set digi ch0 l/r volumes
-  poke $d71c,$66 : poke $d729, $66
+  poke $d71c + dchan, $66
+  poke $d729 + doffs, $66
 
   ' sample_rate = (16000 * 2^24) / (40.5 * 10^6) = 6628 = $19E4
 
   ' sample rate 16kHz
-  poke $d724, srate and 255
-  poke $d725, (srate / 256) and 255
-  poke $d726, (srate / 65536) and 255
+  poke $d724 + doffs, srate and 255
+  poke $d725 + doffs, (srate / 256) and 255
+  poke $d726 + doffs, (srate / 65536) and 255
 
   ' play unsigned 16-bit sound with looping
   k = $80 + $03
   if looping then k = k + $40
-  poke $d720, k
+  poke $d720 + doffs, k
 
   return
 
@@ -536,16 +557,14 @@
 '-----------------
 .end_audio_looping
 '-----------------
-
-  ' switch it off!
-  ' --------------
+  doffs = dchan * $10
 
   ' end (loop-point) of sample
   v = fend * 2
-  wpoke $d727, v
+  wpoke $d727 + doffs, v
 
   ' play unsigned 16-bit sound without looping
-  poke $d720, $80 + $00 + $03
+  poke $d720 + doffs, $80 + $00 + $03
 
   return
 ÿ
