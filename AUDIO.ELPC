@@ -15,6 +15,7 @@
 #declare audioidx, seqstate
 #declare notemap(6), sharpnotemap(6), duration, sharp_flag, dotted_flag
 #declare mytempo, dt_digi, is_digi_playing, digi_start, time_duration
+#declare is_rest
 
 
 '-------
@@ -96,7 +97,7 @@
   tempo 20
   envelope 6, 0, 9, 0, 0
   envelope 7, 0, 9, 9, 0
-  ' play "t6o1 iaaaaaa aaaaaa l",,,"t7io2ao3egao4co3gaegdeg l"
+  play "t6o1 iaaaaaa aaaaaa l",,,"t7io2ao3egao4co3gaegdeg l"
 
   ' v$ = "i%0e%1e%2e%3e%4e %2e%3e%4e %2e%3e%4e %2e"
   v$ = "i -%0e %1b + %2d %3e %4g %2d %3f - %4b +%2d -%3a %4b +%2d"
@@ -142,11 +143,13 @@
     octave = 0
     audioidx = 1
     is_digi_playing = 0
+    is_rest = 0
 
     print "{x93}? ";v$    
     input "{x13}";v$
 
     seqstate = SEQ_MAIN
+    time_duration = ti
 
     do while audioidx <> -1
       gosub poll_digis
@@ -166,9 +169,10 @@
     ' print "ti-digi_start = ";ti-digi_start
     ' print "time_duration = ";time_duration
 
-    if (ti - digi_start) >= time_duration then begin
-      if sample_looping(sidx) then gosub end_audio_looping
+    if ti >= time_duration then begin
+      if not is_rest and sample_looping(sidx) then gosub end_audio_looping
       is_digi_playing = 0
+      is_rest = 0
     bend : else begin
       return
     bend
@@ -207,9 +211,9 @@
       gosub play_with_srate
 
       if dotted_flag then begin
-        time_duration = dt_digi * duration * 1.5
+        time_duration = time_duration + dt_digi * duration * 1.5
       bend : else begin
-        time_duration =  dt_digi * duration
+        time_duration = time_duration + dt_digi * duration
       bend
 
       dotted_flag = 0
@@ -222,7 +226,14 @@
     if ch$ = "h" then duration = 8
     if ch$ = "w" then duration = 16
 
-    if ch$ = "r" then sleep TIMEGAP * duration
+    if ch$ = "r" then begin
+      is_rest = 1
+      if dotted_flag then begin
+        time_duration = time_duration + dt_digi * duration * 1.5
+      bend : else begin
+        time_duration = time_duration + dt_digi * duration
+      bend
+    bend
 
   bend : goto skip_seq
 
@@ -504,7 +515,7 @@
   wpoke $d727, v
 
   ' set digi ch0 l/r volumes
-  poke $d71c,$22 : poke $d729, $22
+  poke $d71c,$66 : poke $d729, $66
 
   ' sample_rate = (16000 * 2^24) / (40.5 * 10^6) = 6628 = $19E4
 
