@@ -39,6 +39,7 @@
 #define SEQ_MAIN = 0
 #define SEQ_SELECT_SAMPLE = 1
 #define TIMEGAP = .05
+#define PITCH_BEND = .44
 
 
 '----
@@ -100,7 +101,7 @@
   play "t6o1 iaaaaaa aaaaaa l",,,"t7io2ao3egao4co3gaegdeg l"
 
   ' v$ = "i%0e%1e%2e%3e%4e %2e%3e%4e %2e%3e%4e %2e"
-  v$ = "i -%0e %1b + %2d %3e %4g %2d %3f - %4b +%2d -%3a %4b +%2d"
+  v$ = "i -%0a +%1e %2g %3a +%4c -%2g %3a %4e %2g %3d %4e %2g"
 
 '----
 .main
@@ -199,9 +200,9 @@
       srate = sample_srate(sidx)
 
       if sharp_flag then begin
-        srate = srate * dt_semi ^ (sharpnotemap(k) + octave * 12)
+        srate = srate * dt_semi ^ (sharpnotemap(k) + (octave - PITCH_BEND) * 12)
       bend : else begin
-        srate = srate * dt_semi ^ (notemap(k) + octave * 12)
+        srate = srate * dt_semi ^ (notemap(k) + (octave - PITCH_BEND) * 12)
       bend
 
       sharp_flag = 0
@@ -292,7 +293,7 @@
   for k = 0 to 11
     if a$ = note_key$(k) then begin
       srate = sample_srate(sidx)
-      srate = srate * dt_semi ^ (k + octave * 12)
+      srate = srate * dt_semi ^ (k + (octave - PITCH_BEND) * 12)
       gosub play_with_srate
     bend
   next k
