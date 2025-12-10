@@ -92,6 +92,14 @@
   sharpnotemap(5) = 10 ' a#
   sharpnotemap(6) = 11 ' b# (ought to be high c, but let's ignore it for now)
 
+  vol 3,3
+  tempo 20
+  envelope 6, 0, 9, 0, 0
+  envelope 7, 0, 9, 9, 0
+  ' play "t6o1 iaaaaaa aaaaaa l",,,"t7io2ao3egao4co3gaegdeg l"
+
+  ' v$ = "i%0e%1e%2e%3e%4e %2e%3e%4e %2e%3e%4e %2e"
+  v$ = "i -%0e %1b + %2d %3e %4g %2d %3f - %4b +%2d -%3a %4b +%2d"
 
 '----
 .main
@@ -134,7 +142,8 @@
     octave = 0
     audioidx = 1
     is_digi_playing = 0
-    
+
+    print "{x93}? ";v$    
     input "{x13}";v$
 
     seqstate = SEQ_MAIN
@@ -193,9 +202,9 @@
 
       sharp_flag = 0
 
-      gosub play_with_srate
       digi_start = ti
       is_digi_playing = 1
+      gosub play_with_srate
 
       if dotted_flag then begin
         time_duration = dt_digi * duration * 1.5
