@@ -34,10 +34,11 @@ trap runstop_trapper
 #declare cursor_x = 0
 #declare cursor_y = 0
 
-#declare v$(5,chunk_max)
+#declare v$(9, chunk_max)
 
 #declare key$
 #declare valid$="cdefgab0123456789 #$.hiqrswotuxmpl"
+#declare valid_digi$="-+%"
 #declare val$
 #declare tmpo% = 12
 
@@ -64,6 +65,40 @@ ENVTYPE envs(9) = [ {x5F}
 #declare error$, error, cur_note$, verbose, note_idx, new_octave_flag
 #declare octave_tweaked, prev_trans_octave
 
+#declare use_digis, maxidx
+
+#declare notemap(6), sharpnotemap(6), mytempo, dt_digi
+
+#declare sidx(3)
+#declare audioidx(3), seqstate(3)
+#declare duration(3), sharp_flag(3), dotted_flag(3)
+#declare is_digi_playing(3), time_duration(3)
+#declare is_rest(3), octave(3)
+
+#declare dchan, doffs
+
+#struct SAMPLE name$, looping, start%, playback, loop, finish, srate
+
+' TODO: replace this with loadable/saveable sample data one day...
+  SAMPLE sample(5) = [ {x5F}
+    [ "get", 1, 0,     1631,  2091,  3700, $19e4 ], {x5F}
+    [ "to",  0, 3700,  0,     0,     5710, $1ca0 ], {x5F}
+    [ "the", 0, 5800,  0,     0,     8000, $1c64 ], {x5F}
+    [ "cho", 1, 8701,  11334, 12100, 14200, $1c3c ], {x5F}
+    [ "per", 1, 14301, 16830, 17796, 26914, $1c6e ], {x5F}
+    [ "all", 0, 0,     0,     0,     26914, $19e4 ] {x5F}
+  ]
+
+' TODO: remove this once I can generically load any sample
+  bload "chopper16k.raw",p($50000)
+
+
+#declare fstart, fplayback, floop, fend, looping, srate
+#declare dt_semi = 1.05946309436
+#declare digi_playmode
+
+#declare ln
+
 verbose = 0
 
 '-------
@@ -83,6 +118,11 @@ verbose = 0
 #define ERR_MISSING_OCTAVE = 2
 #define ERR_OCTAVE_OVERFLOW = 3
 #define ERR_OCTAVE_UNDERFLOW = 4
+
+#define SEQ_MAIN = 0
+#define SEQ_SELECT_SAMPLE = 1
+#define TIMEGAP = .05
+#define PITCH_BEND = .44
 
 note$(0) = "c"
 note$(1) = "#c"
@@ -159,6 +199,10 @@ FILTTYPE filt(10) = [ {x5F}
 #define CMD_VOL = -9
 #define CMD_DELAY = -10
 #define CMD_MAX = 11
+
+#define DIGI_IDLE = 0
+#define DIGI_SINGLE = 1
+#define DIGI_MULTI = 2
 
 #declare seq_cmdname$(10)
 seq_cmdname$(1) = "TEMPO"
@@ -283,6 +327,23 @@ dur$(D_SIXTEENTH, DKEY)  = "5"
 #define KEY_BEEP = chr$(7)
 #define KEY_INST = "{x94}"
 #define KEY_DEL  = "{x14}"
+#define KEY_QUOTE = chr$(34)
+
+notemap(0) = 0  ' c
+notemap(1) = 2  ' d
+notemap(2) = 4  ' e
+notemap(3) = 5  ' f
+notemap(4) = 7  ' g
+notemap(5) = 9  ' a
+notemap(6) = 11 ' b
+
+sharpnotemap(0) = 1  ' c#
+sharpnotemap(1) = 3  ' d#
+sharpnotemap(2) = 5  ' e# = f
+sharpnotemap(3) = 6  ' f#
+sharpnotemap(4) = 8  ' g#
+sharpnotemap(5) = 10 ' a#
+sharpnotemap(6) = 11 ' b# (ought to be high c, but let's ignore it for now)
 
 .init
 '----
@@ -290,6 +351,7 @@ print "{x93}";KEY_LOWERCASE;KEY_ESCAPE;"5";
 play : play ""
 background 0 : border 0
 color 5
+
 
 .main
 '----
@@ -305,6 +367,7 @@ color 5
   print "<: prev chunk, >: next chunk, -/+ tempo, F7=env editor, F9/CTRL-P=seq editor"
   print "RTN: play curr voice, SHFT+RTN: play all voice, F1=load, F3=save, MEGA+Q=quit"
   print "ALT-X/C/V: row cut/copy/paste, ESC-ESC: stop music, ALT-RTN: play from cursor"
+  print "ALT-UP/DOWN: transpose semitone, ALT-,/.: transpose octave, ALT-=: toggle digis"
   print
 
   gosub draw_current_chunk
@@ -313,13 +376,16 @@ color 5
 .draw_current_chunk
 '------------------
   print "tempo: "; tmpo%
-  print "chunk_idx: "; chunk_idx  
+  print "chunk_idx: "; chunk_idx
+
+  maxidx = 5
+  if use_digis then maxidx = 9
    
-  for vidx=0 to 5
+  for vidx=0 to maxidx
     if cursor_y <> vidx then begin
-      cursor 0,9+vidx*2:print chr$(27);"q";"v";vidx+1;": ";v$(vidx,chunk_idx);
+      cursor 0,10+vidx*2:print chr$(27);"q";"v";vidx+1;": ";v$(vidx,chunk_idx);
     bend:else begin
-      cursor 0,9+vidx*2:print chr$(27);"q";"v";vidx+1;": ";
+      cursor 0,10+vidx*2:print chr$(27);"q";"v";vidx+1;": ";
       for idx=1 to len(v$(vidx,chunk_idx))
         if cursor_x = idx-1 then begin
           print "{x12}";mid$(v$(vidx,chunk_idx),idx,1);"{x92}";
@@ -330,24 +396,23 @@ color 5
       if len(v$(vidx,chunk_idx)) = 0 or cursor_x=len(v$(vidx,chunk_idx)) then print "{x12} {x92}";
     bend
   next vidx
+
   return
 
 .check_valid_key
 '---------------
-  for idx=1 to len(valid$)
-    val$=mid$(valid$,idx,1)
-    if key$= val$ then begin
-      if cursor_x < len(v$(cursor_y,chunk_idx)) then begin
-        v$(cursor_y,chunk_idx) = left$(v$(cursor_y,chunk_idx),cursor_x) {x5F}
-          + val$ + mid$(v$(cursor_y,chunk_idx),cursor_x+1)
-        cursor_x=cursor_x+1
-        return
-      bend
-      v$(cursor_y,chunk_idx)=v$(cursor_y,chunk_idx)+val$
+  if instr(valid$, key$)>0 or (use_digis and instr(valid_digi$, key$)>0) then begin
+    if cursor_x < len(v$(cursor_y,chunk_idx)) then begin
+      v$(cursor_y,chunk_idx) = left$(v$(cursor_y,chunk_idx),cursor_x) {x5F}
+        + key$ + mid$(v$(cursor_y,chunk_idx),cursor_x+1)
       cursor_x=cursor_x+1
       return
     bend
-  next idx
+    v$(cursor_y,chunk_idx)=v$(cursor_y,chunk_idx)+key$
+    cursor_x=cursor_x+1
+    return
+  bend
+
   return
 
 .forward_word
@@ -400,8 +465,11 @@ color 5
   ' load melody chunks
   ' ------------------
   input #2, chunk_cnt
+  use_digis = 0
+  maxidx = 5
+  if chunk_cnt <0 then use_digis=1 : chunk_cnt = -chunk_cnt : maxidx = 9
   for chunk_idx = 0 to chunk_cnt - 1
-    for vidx=0 to 5
+    for vidx=0 to maxidx
       input #2,v$(vidx, chunk_idx)
     next vidx
   next chunk_idx
@@ -477,9 +545,12 @@ color 5
   ' save melody chunks
   ' ------------------
   gosub get_chunk_cnt
+  maxidx = 5
+  if use_digis then chunk_cnt = -chunk_cnt : maxidx = 9
   print #2, chunk_cnt
+  chunk_cnt = abs(chunk_cnt)
   for chunk_idx = 0 to chunk_cnt - 1
-    for vidx=0 to 5
+    for vidx=0 to maxidx
       print #2,v$(vidx, chunk_idx)
     next vidx
   next chunk_idx
@@ -532,59 +603,91 @@ color 5
   input "save (as text) name: ";key$
   if key$="" then return
 
+  delete "playtmp"
   delete (key$)
-    
-  dopen #2,(key$),w,u8
 
-  print #2, "rem *** init music vars ***"
+  ln = 1000
+    
+  dopen #2,"playtmp",w,u8
+
+  print #2, str$(ln) + " rem *** init music vars ***"
   gosub get_chunk_cnt
 
   chk$ = mid$(str$(chunk_cnt),2)
 
+  ln=ln+10:print #2, str$(ln) + " dim v0$(";chk$;"):";
   print #2, "dim v1$(";chk$;"):";
   print #2, "dim v2$(";chk$;"):";
   print #2, "dim v3$(";chk$;"):";
   print #2, "dim v4$(";chk$;"):";
   print #2, "dim v5$(";chk$;"):";
-  print #2, "dim v6$(";chk$;")"
+
+  maxidx = 5
+  if use_digis then begin
+    maxidx = 9
+    print #2, "dim v6$(";chk$;"):";
+    print #2, "dim v7$(";chk$;"):";
+    print #2, "dim v8$(";chk$;"):";
+    print #2, "dim v9$(";chk$;"):";
+  bend
+  print
 
   print #2, "t=0:rem music chunk index"
-  print #2, "tt=0:rem bar index"
-  print #2, "dim m(";mid$(str$(seqcnt),2);")"
+  ln=ln+10:print #2, str$(ln)+" tt=0:rem bar index"
+  ln=ln+10:print #2, str$(ln)+" dim m(";mid$(str$(seqcnt),2);")"
 
   k = seq_offs
+  ln=ln+10:print #2, str$(ln)+" ";
   for k = 0 to seqcnt
     print #2, "m(";mid$(str$(k),2);")=";str$(seq_chunk(k));
     if mod(k+1,8) = 0 or k = seqcnt then begin
       print #2, ""
+      ln=ln+10:print #2, str$(ln)+" ";
     bend:else begin
       print #2, ":";
     bend
   next k
 
+  print #2, ""
+
   for chunk_idx = 0 to chunk_cnt-1
-    for vidx=0 to 5
-      print #2, "v";chr$(49+vidx);"$(";mid$(str$(chunk_idx),2);")=";
+    for vidx=0 to maxidx
+      ln=ln+10
+      print #2, str$(ln);
+      print #2, " v";chr$(48+vidx);"$(";mid$(str$(chunk_idx),2);")=";
       print #2, chr$(34);v$(vidx, chunk_idx);chr$(34)
     next vidx  
     print #2, ""
   next chunk_idx
 
   for k = 0 to 9
-    print #2, "envelope";k;",";envs_attack(k);",";envs_decay(k);",";
-    print #2, envs_sustain(k);",";envs_release(k)
+    ln=ln+10:print #2, str$(ln)+" ";
+    print #2, " envelope";k;",";envs_attack(k);",";envs_decay(k);",";
+    print #2, envs_sustain(k);",";envs_release(k);",";envs_waveform(k);
+    print #2, ",";envs_pw(k)
   next k
 
+  ln=ln+10:print #2, str$(ln)+" ";
   print #2, "return"
 
+  ln=ln+10:print #2, str$(ln)+" ";
   print #2, "rem *** poll for playing of next song chunk"
+  ln=ln+10:print #2, str$(ln)+" ";
   print #2, "if rplay(1) then return"
+  ln=ln+10:print #2, str$(ln)+" ";
   print #2, "t = m(tt) : rem music_chunk_index = map_bar_to_chunk(bar_index)"
-  print #2, "play v1$(t), v2$(t), v3$(t), v4$(t), v5$(t), v6$(t)"
+  ln=ln+10:print #2, str$(ln)+" ";
+  print #2, "play v0$(t), v1$(t), v2$(t), v3$(t), v4$(t), v5$(t)"
+  ln=ln+10:print #2, str$(ln)+" ";
   print #2, "tt=tt+1"
+  ln=ln+10:print #2, str$(ln)+" ";
   print #2, "if m(tt) = -1 then tt = 0"
+  ln=ln+10:print #2, str$(ln)+" ";
   print #2, "return"
 
+  print #2, "delete 32000-"
+  print #2, "dsave " + KEY_QUOTE + key$ + KEY_QUOTE
+  print #2, "border 7"
   dclose #2
 
   chunk_idx = 0
@@ -599,8 +702,11 @@ color 5
 
   gosub check_alt_key_inputs
 
+  maxidx = 5
+  if use_digis then maxidx = 9
+
   ' down arrow?
-  if key$ = KEY_DOWN and cursor_y<5 then begin
+  if key$ = KEY_DOWN and cursor_y < maxidx then begin
     cursor_y = cursor_y + 1
     if cursor_x > len(v$(cursor_y,chunk_idx)) then cursor_x = {x5F}
       len(v$(cursor_y,chunk_idx))
@@ -674,7 +780,7 @@ color 5
   if key$ = KEY_F4 then gosub save_as_text
 
   ' return=play row
-  if key$ = KEY_RETURN then tempo tmpo% : play v$(cursor_y,chunk_idx)
+  if key$ = KEY_RETURN then tempo tmpo% : gosub play_single_channel
 
   ' shift+return=play all channels
   if key$ = KEY_SHIFT_RETURN then begin
@@ -691,6 +797,51 @@ color 5
 
   gosub check_valid_key
   return
+
+.play_single_channel
+'-------------------
+  if cursor_y < 6 then begin
+    play v$(cursor_y, chunk_idx)
+    return
+  bend
+
+  ' play a digi channel
+  mytempo = tmpo%
+  dt_digi = 24 / mytempo / 16
+  dchan = cursor_y - 6
+  gosub init_dchan_vars
+
+  digi_playmode = DIGI_SINGLE
+
+  return
+
+
+.prepare_multi_digis
+'-------------------
+  ' play a digi channel
+  mytempo = tmpo%
+  dt_digi = 24 / mytempo / 16
+  for dchan = 0 to 3
+    gosub init_dchan_vars
+  next dchan
+
+  digi_playmode = DIGI_MULTI
+  return
+
+
+.init_dchan_vars
+'---------------
+  audioidx(dchan) = 1
+  is_digi_playing(dchan) = 0
+  is_rest(dchan) = 0
+  duration(dchan) = 4
+  sharp_flag(dchan) = 0
+  dotted_flag(dchan) = 0
+  octave(dchan) = 0
+  seqstate(dchan) = SEQ_MAIN
+  time_duration(dchan) = ti
+  return
+
 
 .check_alt_key_inputs
 '--------------------
@@ -717,6 +868,10 @@ color 5
   if key$=KEY_UP then gosub increment_semitone
   if key$=KEY_DOWN then gosub decrement_semitone
 
+  if key$ = "=" then begin
+    if use_digis = 0 then use_digis = 1 : else use_digis = 0
+    if cursor_y >5 and use_digis = 0 then cursor_y = 5
+  bend
 
   key$ = ""
   return
@@ -843,6 +998,9 @@ color 5
   v4$ = v$(3,chunk_idx)
   v5$ = v$(4,chunk_idx)
   v6$ = v$(5,chunk_idx)
+
+  if use_digis then gosub prepare_multi_digis
+  if use_digis then gosub poll_digi_state
 
   if echo_delay = 1 then begin
     play v1$
@@ -1090,8 +1248,27 @@ color 5
     if plyflag = 1 then begin
       if rplay(1) = 0 then gosub parse_current_seqptr
     bend
+
+    gosub poll_digi_state
+
   loop
   return
+
+
+.poll_digi_state
+'---------------
+  if digi_playmode = DIGI_SINGLE then begin
+    gosub poll_digis
+  bend
+
+  if digi_playmode = DIGI_MULTI then begin
+    for dchan = 0 to 3
+      gosub poll_digis
+    next dchan
+  bend
+
+  return
+
 
 .parse_current_seqptr
 '--------------------
@@ -1561,113 +1738,5 @@ color 5
   if (int(seqptr / 43) * 43) < seq_offs then seq_offs = seq_offs - 43
   if (int(seqptr / 43) * 43) > (seq_offs+43) then seq_offs = seq_offs + 43
 
-  return
-
-.stop_all_music
-'--------------
-  plyptr = -1
-  plyflag = 0
-  play:play ""
-  gosub set_all_env
-  tempo tmpo%
-  gosub apply_selected_filter
-  return
-
-.delete_chunk_seq
-'----------------
-  if seqcnt = 0 then return
-
-  k = seqptr
-  do while k < seqcnt - 1
-    seq_chunk(k) = seq_chunk(k + 1)
-    seq_extra(k) = seq_extra(k + 1)
-    k = k + 1
-  loop
-
-  seqcnt = seqcnt - 1
-
-  if seqptr = seqcnt and seqptr>0 then seqptr = seqptr - 1
-  return
-
-.edit_chunk_seq
-'--------------
-  if seqcnt = 0 then return
-
-  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
-  v=0:input "chunk#: ", v
-  seq_chunk(seqptr) = v
-
-  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
-  v=-1:input "extra#: ", v
-  seq_extra(seqptr) = v
-  return
-
-.edit_chunk_cell
-'---------------
-  if seqcnt = 0 then return
-
-  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
-
-  if sscol = 0 then begin
-    v = seq_chunk(seqptr)
-
-    v1$ = str$(v)
-    if left$(v1$,1) = " " then v1$=mid$(v1$,2)
-
-    print "chunk#: ";KEY_ESCAPE;"^";v1$;KEY_ESCAPE;"{x5F}";
-    input "", v
-    seq_chunk(seqptr) = v
-  bend
-
-  if sscol = 1 then begin
-    v = seq_extra(seqptr)
-
-    v1$ = str$(v)
-    if left$(v1$,1) = " " then v1$=mid$(v1$,2)
-
-    print "extra#: ";KEY_ESCAPE;"^";v1$;KEY_ESCAPE;"{x5F}";
-    input "", v
-    seq_extra(seqptr) = v
-  bend
-
-  return
-
-.edit_chunk_cmd
-'--------------
-  v = -seq_chunk(seqptr)
-  print KEY_CLR;
-  for row = 1 to CMD_MAX - 1
-    print row;":"; seq_cmdname$(row)
-  next row
-  print
-  input "cmd: ", v
-
-  if v > 0 then seq_chunk(seqptr) = -v
-  return
-
-
-.insert_chunk_to_seq
-'-------------------
-  seqcnt = seqcnt + 1
-
-  ' move all higher chunk sequences up one
-  k = seqcnt - 2
-  do while k >= seqptr
-    seq_chunk(k+1) = seq_chunk(k)
-    seq_extra(k+1) = seq_extra(k)
-    k = k - 1
-  loop
-
-  seq_chunk(seqptr) = 0
-  seq_extra(seqptr) = 0
-
-  return
-
-.add_chunk_to_seq
-'----------------
-  seqptr = seqcnt
-  seqcnt = seqcnt + 1
-  seq_chunk(seqptr) = 0
-  seq_extra(seqptr) = 0
   return
 ÿ

@@ -1,5 +1,114 @@
 ' continuation of 'melody.el' file...
 
+.stop_all_music
+'--------------
+  plyptr = -1
+  plyflag = 0
+  play:play ""
+  gosub set_all_env
+  tempo tmpo%
+  gosub apply_selected_filter
+  return
+
+.delete_chunk_seq
+'----------------
+  if seqcnt = 0 then return
+
+  k = seqptr
+  do while k < seqcnt - 1
+    seq_chunk(k) = seq_chunk(k + 1)
+    seq_extra(k) = seq_extra(k + 1)
+    k = k + 1
+  loop
+
+  seqcnt = seqcnt - 1
+
+  if seqptr = seqcnt and seqptr>0 then seqptr = seqptr - 1
+  return
+
+.edit_chunk_seq
+'--------------
+  if seqcnt = 0 then return
+
+  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
+  v=0:input "chunk#: ", v
+  seq_chunk(seqptr) = v
+
+  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
+  v=-1:input "extra#: ", v
+  seq_extra(seqptr) = v
+  return
+
+
+.edit_chunk_cell
+'---------------
+  if seqcnt = 0 then return
+
+  print KEY_HOME;KEY_TAB;KEY_TAB;KEY_ESCAPE;"q";
+
+  if sscol = 0 then begin
+    v = seq_chunk(seqptr)
+
+    v1$ = str$(v)
+    if left$(v1$,1) = " " then v1$=mid$(v1$,2)
+
+    print "chunk#: ";KEY_ESCAPE;"^";v1$;KEY_ESCAPE;"{x5F}";
+    input "", v
+    seq_chunk(seqptr) = v
+  bend
+
+  if sscol = 1 then begin
+    v = seq_extra(seqptr)
+
+    v1$ = str$(v)
+    if left$(v1$,1) = " " then v1$=mid$(v1$,2)
+
+    print "extra#: ";KEY_ESCAPE;"^";v1$;KEY_ESCAPE;"{x5F}";
+    input "", v
+    seq_extra(seqptr) = v
+  bend
+
+  return
+
+.edit_chunk_cmd
+'--------------
+  v = -seq_chunk(seqptr)
+  print KEY_CLR;
+  for row = 1 to CMD_MAX - 1
+    print row;":"; seq_cmdname$(row)
+  next row
+  print
+  input "cmd: ", v
+
+  if v > 0 then seq_chunk(seqptr) = -v
+  return
+
+
+.insert_chunk_to_seq
+'-------------------
+  seqcnt = seqcnt + 1
+
+  ' move all higher chunk sequences up one
+  k = seqcnt - 2
+  do while k >= seqptr
+    seq_chunk(k+1) = seq_chunk(k)
+    seq_extra(k+1) = seq_extra(k)
+    k = k - 1
+  loop
+
+  seq_chunk(seqptr) = 0
+  seq_extra(seqptr) = 0
+
+  return
+
+.add_chunk_to_seq
+'----------------
+  seqptr = seqcnt
+  seqcnt = seqcnt + 1
+  seq_chunk(seqptr) = 0
+  seq_extra(seqptr) = 0
+  return
+
 '----------
 .state_main
 '----------
@@ -162,6 +271,181 @@
     on transpose_state gosub state_main, state_octave
     if error <> 0 then k = len(cur_v$)  ' bail early
   next k
+
+  return
+
+
+'----------
+.poll_digis
+'----------
+  ' parse and play the audio string
+
+  if is_digi_playing(dchan) then begin
+    if ti >= time_duration(dchan) then begin
+      ' print "got here!"
+      if not is_rest(dchan) and sample_looping(sidx(dchan)) then gosub end_audio_looping
+      is_digi_playing(dchan) = 0
+      is_rest(dchan) = 0
+    bend : else begin
+      return
+    bend
+  bend
+
+  if audioidx(dchan) > len(v$(6 + dchan, chunk_idx)) then audioidx(dchan) = -1 : return
+
+  if audioidx(dchan) = -1 then return
+
+  ch$ = mid$(v$(6 + dchan, chunk_idx), audioidx(dchan), 1)
+  ' print "dchan=";dchan;" : v$(6 + dchan) = ";v$(6 + dchan)
+  'print "audioidx=";audioidx(dchan);" : ch$=";ch$
+
+  if seqstate(dchan) = SEQ_MAIN then begin
+
+    if ch$ = "%" then seqstate(dchan) = SEQ_SELECT_SAMPLE
+
+    if ch$ = "#" then sharp_flag(dchan) = 1
+    if ch$ = "." then dotted_flag(dchan) = 1
+
+    if ch$ = "-" then octave(dchan) = octave(dchan) - 1
+    if ch$ = "+" then octave(dchan) = octave(dchan) + 1
+
+    if ch$ >= "a" and ch$ <= "g" then begin
+      if ch$ >= "c" then k = asc(ch$) - asc("c")
+      if ch$ = "a" then k = 5
+      if ch$ = "b" then k = 6
+      srate = sample_srate(sidx(dchan))
+
+      if sharp_flag(dchan) then begin
+        srate = srate * dt_semi ^ (sharpnotemap(k) + (octave(dchan) - PITCH_BEND) * 12)
+      bend : else begin
+        srate = srate * dt_semi ^ (notemap(k) + (octave(dchan) - PITCH_BEND) * 12)
+      bend
+
+      sharp_flag(dchan) = 0
+
+      is_digi_playing(dchan) = 1
+      gosub play_with_srate
+
+      if dotted_flag(dchan) then begin
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan) * 1.5
+      bend : else begin
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan)
+      bend
+      'print "time_duration=";time_duration(dchan)
+
+      dotted_flag(dchan) = 0
+
+    bend
+
+    if ch$ = "s" then duration(dchan) = 1
+    if ch$ = "i" then duration(dchan) = 2
+    if ch$ = "q" then duration(dchan) = 4
+    if ch$ = "h" then duration(dchan) = 8
+    if ch$ = "w" then duration(dchan) = 16
+
+    if ch$ = "r" then begin
+      is_rest(dchan) = 1
+      if dotted_flag(dchan) then begin
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan) * 1.5
+      bend : else begin
+        time_duration(dchan) = time_duration(dchan) + dt_digi * duration(dchan)
+      bend
+      is_digi_playing(dchan) = 1
+      sharp_flag(dchan) = 0
+      dotted_flag(dchan) = 0
+    bend
+
+  bend : goto skip_seq
+
+  if seqstate(dchan) = SEQ_SELECT_SAMPLE then begin
+    sidx(dchan) = val(ch$)
+    ' print "sidx=";sidx;"(";ch$;")"
+    seqstate(dchan) = SEQ_MAIN
+  bend
+
+.skip_seq
+  audioidx(dchan) = audioidx(dchan) + 1
+
+  goto poll_digis  ' see if we're in a position to parse more of the string...
+
+  return
+
+
+'--------------
+.play_with_srate
+'--------------
+  ' print "sample#";mid$(str$(sidx),2);" @ ";hex$(srate)
+  gosub play_var_srate
+  return
+
+
+'--------------
+.play_var_srate
+'--------------
+  fstart = sample_start%(sidx(dchan))
+  fplayback = sample_playback(sidx(dchan))
+  floop = sample_loop(sidx(dchan))
+  fend = sample_finish(sidx(dchan))
+  looping = sample_looping(sidx(dchan))
+
+  gosub play_audio
+  return
+
+
+'----------
+.play_audio
+'----------
+  doffs = dchan * $10
+
+  ' switch off digi channel 0
+  poke $d720 + doffs, 0
+
+  ' sample starts at $5.0000
+  v = fplayback * 2
+  poke $d721 + doffs, v and 255
+  poke $d722 + doffs, v / 256
+  poke $d723 + doffs, $05
+
+  ' set playhead to beginning
+  v = fstart * 2
+  poke $d72a + doffs, v and 255
+  poke $d72b + doffs, v / 256
+  poke $d72c + doffs, $05
+
+  ' end (loop-point) of sample
+  if looping then v = floop * 2 : else v = fend * 2
+  wpoke $d727 + doffs, v
+
+  ' set digi ch0 l/r volumes
+  poke $d71c + dchan, $aa
+  poke $d729 + doffs, $aa
+
+  ' sample_rate = (16000 * 2^24) / (40.5 * 10^6) = 6628 = $19E4
+
+  ' sample rate 16kHz
+  poke $d724 + doffs, srate and 255
+  poke $d725 + doffs, (srate / 256) and 255
+  poke $d726 + doffs, (srate / 65536) and 255
+
+  ' play unsigned 16-bit sound with looping
+  k = $80 + $03
+  if looping then k = k + $40
+  poke $d720 + doffs, k
+
+  return
+
+
+'-----------------
+.end_audio_looping
+'-----------------
+  doffs = dchan * $10
+
+  ' end (loop-point) of sample
+  v = fend * 2
+  wpoke $d727 + doffs, v
+
+  ' play unsigned 16-bit sound without looping
+  poke $d720 + doffs, $80 + $00 + $03
 
   return
 ÿ
