@@ -1,3 +1,4 @@
+    5 bload "chopper16k.raw",p($50000)
    10 gosub 1000
    20 do while 1 : gosub 3400 : loop
  1000 rem *** init music vars ***
@@ -238,8 +239,18 @@
  3360  envelope 7 , 0 , 8 , 0 , 0 , 2 , 1048 
  3370  envelope 8 , 8 , 9 , 4 , 9 , 2 , 512 
  3380  envelope 9 , 0 , 9 , 0 , 0 , 0 , 0 
- 3385 tempo 20
- 3390 return
+ 3381 tempo 20
+ 3382 dim sl%(5):sl%(0)=1:sl%(1)=0:sl%(2)=0:sl%(3)=1:sl%(4)=1:sl%(5)=0
+ 3383 dim ss%(5):ss%(0)=0:ss%(1)=3700:ss%(2)=5800:ss%(3)=8701:ss%(4)=14301:ss%(5)=0
+ 3384 dim sp%(5):sp%(0)=1631:sp%(1)=0:sp%(2)=0:sp%(3)=11334:sp%(4)=16830:sp%(5)=0
+ 3385 dim so%(5):so%(0)=2091:so%(1)=0:so%(2)=0:so%(3)=12100:so%(4)=17796:so%(5)=0
+ 3386 dim sf%(5):sf%(0)=3700:sf%(1)=5710:sf%(2)=8000:sf%(3)=14200:sf%(4)=26914:sf%(5)=26914
+ 3387 dim sr%(5):sr%(0)=$19e4:sr%(1)=$1ca0:sr%(2)=$1c64:sr%(3)=$1c3c:sr%(4)=$1c6e:sr%(5)=$19e4
+ 3388 dim nm(6):nm(0)=0:nm(1)=2:nm(2)=4:nm(3)=5:nm(4)=7:nm(5)=9:nm(6)=11
+ 3389 dim sh(6):sh(0)=1:sh(1)=3:sh(2)=5:sh(3)=6:sh(4)=8:sh(5)=10:sh(6)=11
+ 3390 pb = 0.44 : rem pitchandbend
+ 3391 dt = 1.05946309436 : rem dtandsemi
+ 3399 return
  3400 rem *** poll for playing of next song chunk
  3410 if rplay(1) then return
  3412 gosub 3500 : rem prepare multi digis
@@ -303,9 +314,9 @@
  4020     if ch$ = "b" then k = 6
  4030     s = ra(si(dc))
  4040     if sf(dc) then begin
- 4050       s = s * ds ^ (sh(k) + (oc(dc) - pb) * 12)
+ 4050       s = s * dt ^ (sh(k) + (oc(dc) - pb) * 12)
  4060     bend : else begin
- 4070       s = s * ds ^ (no(k) + (oc(dc) - pb) * 12)
+ 4070       s = s * dt ^ (no(k) + (oc(dc) - pb) * 12)
  4080     bend
  4090     sf(dc) = 0
  4100     id(dc) = 1
