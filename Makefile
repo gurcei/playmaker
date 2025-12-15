@@ -7,6 +7,10 @@ all:
 	c1541 -attach "C:\Users\phuon\AppData\Roaming\xemu-lgb\mega65\hdos\11.D81" -read monkey monkey.prg
 	petcat -65 -o monkey.bas -- monkey.prg
 
+airwolf.bas:
+	c1541 -attach "C:\Users\phuon\AppData\Roaming\xemu-lgb\mega65\hdos\112.D81" -read airwolf
+	petcat -65 -o airwolf.bas -- airwolf
+
 tod81:
 	c1541 -attach "C:\Users\gurcei\AppData\Roaming\xemu-lgb\mega65\hdos\11.D81" -delete melody.el -write melody.el melody.el,s
 
