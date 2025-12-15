@@ -242,8 +242,137 @@
  3390 return
  3400 rem *** poll for playing of next song chunk
  3410 if rplay(1) then return
+ 3412 gosub 3500 : rem prepare multi digis
+ 3414 gosub 3700 : rem poll digi state
  3420 t = m(tt) : rem musicandchunkandindex = mapandbarandtoandchunk(barandindex)
  3430 play v0$(t), v1$(t), v2$(t), v3$(t), v4$(t), v5$(t)
  3440 tt=tt+1
  3450 if m(tt) = -1 then tt = 0
  3460 return
+ 3500 rem *** prepare multi digis ***
+ 3505 dd = 24 / 20 / 16 : rem dtanddigi = 24 / tempo / 16
+ 3510 for dc = 0 to 3 : rem dc = dchan
+ 3520   gosub 3600 : rem gosub initanddchanandvars
+ 3530 next dc
+ 3540 dp = 2 : rem digiandplaymode = digiandmulti
+ 3550 return
+ 3600 rem *** init dchan vars ***
+ 3610 ai(dc) = 1 : rem audioidx(dchan) = 1
+ 3620 id(dc) = 0 : rem isanddigiandplaying(dchan) = 0
+ 3630 ir(dc) = 0 : rem isandrest
+ 3640 dr(dc) = 4 : rem duration
+ 3650 sf(dc) = 0 : rem sharpandflag
+ 3660 df(dc) = 0 : rem dottedandflag
+ 3670 oc(dc) = 0 : rem octave
+ 3680 ss(dc) = 0 : rem seqstate(dchan) = seqandmain
+ 3690 td(dc) = ti : rem timeandduration
+ 3695 return
+ 3700 rem *** poll digi state ***
+ 3710 if dp = 1 then gosub 3800 : rem if digiandplaymode = digiandsingle then gosub poll digis
+ 3720 if dp = 2 then begin : rem if digiandplaymode = digiandmulti
+ 3730   for dc = 0 to 3
+ 3740     gosub 3800 : rem gosub poll digis
+ 3750   next dc
+ 3760 bend
+ 3770 return
+ 3800 rem *** poll digis ***
+ 3810 if id(dc) then begin
+ 3820   if ti > td(dc) then begin
+ 3830     if not ir(dc) and sl(si(dc)) then gosub 8000 : rem end audio looping
+ 3840     id(dc) = 0
+ 3850     ir(dc) = 0
+ 3860   bend : else begin
+ 3870     return
+ 3880   bend
+ 3890 bend
+ 3900 if dc=0 and ai(dc) >len(v6$(ci)) then ai(dc) = -1 : return
+ 3901 if dc=1 and ai(dc) > len(v7$(ci)) then ai(dc) = -1 : return
+ 3902 if dc=2 and ai(dc) >len(v8$(ci)) then ai(dc) = -1 : return
+ 3903 if dc=3 and ai(dc) > len(v9$(ci)) then ai(dc) = -1 : return
+ 3910 if ai(dc) = -1 then return
+ 3920 if dc=0 then ch$ = mid$(v6$(t), ai(dc), 1)
+ 3930 if ss(dc) = 0 then begin
+ 3940   if ch$ = "%" then ss(dc) = 1
+ 3950   if ch$ = "#" then sf(dc) = 1
+ 3960   if ch$ = "." then df(dc) = 1
+ 3970   if ch$ = "-" then oc(dc) = oc(dc) - 1
+ 3980   if ch$ = "+" then oc(dc) = oc(dc) + 1
+ 3990   if ch$ >= "a" and ch$ <= "g" then begin
+ 4000     if ch$ >= "c" then k = asc(ch$) - asc("c")
+ 4010     if ch$ = "a" then k = 5
+ 4020     if ch$ = "b" then k = 6
+ 4030     s = ra(si(dc))
+ 4040     if sf(dc) then begin
+ 4050       s = s * ds ^ (sh(k) + (oc(dc) - pb) * 12)
+ 4060     bend : else begin
+ 4070       s = s * ds ^ (no(k) + (oc(dc) - pb) * 12)
+ 4080     bend
+ 4090     sf(dc) = 0
+ 4100     id(dc) = 1
+ 4110     gosub 7000 : rem play with srate
+ 4120     if df(dc) then begin
+ 4130       td(dc) = td(dc) + dd * dr(dc) * 1.5
+ 4140     bend : else begin
+ 4150       td(dc)= td(dc) + dd * dr(dc)
+ 4160     bend
+ 4170     df(dc) = 0
+ 4180   bend
+ 4190   if ch$ = "s" then dr(dc) = 1
+ 4200   if ch$ = "i" then dr(dc) = 2
+ 4210   if ch$ = "q" then dr(dc) = 4
+ 4220   if ch$ = "h" then dr(dc) = 8
+ 4230   if ch$ = "w" then dr(dc) = 16
+ 4240   if ch$ = "r" then begin
+ 4250     ir(dc) = 1
+ 4260     if df(dc) then begin
+ 4270       td(dc) = td(dc) + dd * dr(dc) * 1.5
+ 4280     bend : else begin
+ 4290       td(dc) = td(dc) + dd * dr(dc)
+ 4300     bend
+ 4310     id(dc) = 1
+ 4320     sf(dc) = 0
+ 4330     df(dc) = 0
+ 4340   bend
+ 4350 bend : goto 4400 : rem goto skipseq
+ 4360 if ss(dc) = 1 then begin : rem seqandselectandsample
+ 4370   si(dc) = val(ch$)
+ 4380   ss(dc) = seqmain
+ 4390 bend
+ 4400 rem skipandseq
+ 4410 ai(dc) = ai(dc) + 1
+ 4420 goto 3800 : rem goto poll digis
+ 4430 return
+ 7000 rem *** play with srate / playandvarandsrate ***
+ 7010 fs = ss%(si(dc)) : rem fstart = sampleandstart(sidx(dchan))
+ 7020 fp = sp%(si(dc)) : rem fplayback = sampleandplayback
+ 7030 fl = sl%(si(dc)) : rem floop = sampleandloop
+ 7040 fe = sf%(si(dc)) : rem fend = sampleandfinish
+ 7050 lp = sl%(si(dc)) : rem looping = sampleandlooping
+ 7060 gosub 7100 : rem gosub playandaudio
+ 7070 return
+ 7100 rem *** play audio ***
+ 7110 df = dc * $10
+ 7120 poke $d720 + df, 0
+ 7130 v = fp * 2
+ 7140 wpoke $d721 + df, v
+ 7150 poke $d723 + df, $05
+ 7160 v = fs * 2
+ 7170 wpoke $d72a + df, v
+ 7180 poke $d72c + df, $05
+ 7190 if lp then v = fl * 2 : else v = fe * 2
+ 7200 wpoke $d727 + df, v
+ 7210 poke $d71c + dc, $aa
+ 7220 poke $d729 + df, $aa
+ 7230 poke $d724 + df, sr and 255
+ 7240 poke $d725 + df, (sr / 256) and 255
+ 7250 poke $d726 + df, (sr / 65536) and 255
+ 7260 k = $80 + $03
+ 7270 if lp then k = k + $40
+ 7280 poke $d720 + df, k
+ 7290 return
+ 8000 rem *** end audio looping ***
+ 8010 df = dc * $10
+ 8020 v = fe * 2
+ 8030 wpoke $d727 + df, v
+ 8040 poke $d720 + df, $80 + $00 +$03
+ 8050 return
