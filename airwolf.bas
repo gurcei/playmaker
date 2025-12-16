@@ -2,7 +2,7 @@
    10 gosub 1000
    20 do while 1 : gosub 3400 : loop
  1000 rem *** init music vars ***
- 1010 dim v0$(22):dim v1$(22):dim v2$(22):dim v3$(22):dim v4$(22):dim v5$(22):dim v6$(22):dim v7$(22):dim v8$(22):dim v9$(22):t=0:rem music chunk index
+ 1010 dim v0$(22):dim v1$(22):dim v2$(22):dim v3$(22):dim v4$(22):dim v5$(22):dim v6$(22):dim v7$(22):dim v8$(22):dim v9$(22):t=-1:rem music chunk index
  1020 tt=0:rem bar index
  1030 dim m(28)
  1040 m(0)= 11:m(1)= 0:m(2)= 1:m(3)= 2:m(4)= 3:m(5)= 4:m(6)= 12:m(7)= 13
@@ -240,22 +240,23 @@
  3370  envelope 8 , 8 , 9 , 4 , 9 , 2 , 512 
  3380  envelope 9 , 0 , 9 , 0 , 0 , 0 , 0 
  3381 tempo 20
- 3382 dim sl%(5):sl%(0)=1:sl%(1)=0:sl%(2)=0:sl%(3)=1:sl%(4)=1:sl%(5)=0
- 3383 dim ss%(5):ss%(0)=0:ss%(1)=3700:ss%(2)=5800:ss%(3)=8701:ss%(4)=14301:ss%(5)=0
- 3384 dim sp%(5):sp%(0)=1631:sp%(1)=0:sp%(2)=0:sp%(3)=11334:sp%(4)=16830:sp%(5)=0
- 3385 dim so%(5):so%(0)=2091:so%(1)=0:so%(2)=0:so%(3)=12100:so%(4)=17796:so%(5)=0
- 3386 dim sf%(5):sf%(0)=3700:sf%(1)=5710:sf%(2)=8000:sf%(3)=14200:sf%(4)=26914:sf%(5)=26914
- 3387 dim sr%(5):sr%(0)=$19e4:sr%(1)=$1ca0:sr%(2)=$1c64:sr%(3)=$1c3c:sr%(4)=$1c6e:sr%(5)=$19e4
- 3388 dim nm(6):nm(0)=0:nm(1)=2:nm(2)=4:nm(3)=5:nm(4)=7:nm(5)=9:nm(6)=11
- 3389 dim sh(6):sh(0)=1:sh(1)=3:sh(2)=5:sh(3)=6:sh(4)=8:sh(5)=10:sh(6)=11
+ 3382 dim sl%(5):sl%(0)=1:sl%(1)=0:sl%(2)=0:sl%(3)=1:sl%(4)=1:sl%(5)=0 : rem sampleandlooping
+ 3383 dim ss%(5):ss%(0)=0:ss%(1)=3700:ss%(2)=5800:ss%(3)=8701:ss%(4)=14301:ss%(5)=0:rem sampleandstart
+ 3384 dim sp%(5):sp%(0)=1631:sp%(1)=0:sp%(2)=0:sp%(3)=11334:sp%(4)=16830:sp%(5)=0:rem sampleandplayback
+ 3385 dim so%(5):so%(0)=2091:so%(1)=0:so%(2)=0:so%(3)=12100:so%(4)=17796:so%(5)=0:rem sampleandloop
+ 3386 dim sf%(5):sf%(0)=3700:sf%(1)=5710:sf%(2)=8000:sf%(3)=14200:sf%(4)=26914:sf%(5)=26914:rem sampleandfinish
+ 3387 dim sr%(5):sr%(0)=$19e4:sr%(1)=$1ca0:sr%(2)=$1c64:sr%(3)=$1c3c:sr%(4)=$1c6e:sr%(5)=$19e4:rem sampleandsrate
+ 3388 dim nm(6):nm(0)=0:nm(1)=2:nm(2)=4:nm(3)=5:nm(4)=7:nm(5)=9:nm(6)=11: rem notemap
+ 3389 dim sh(6):sh(0)=1:sh(1)=3:sh(2)=5:sh(3)=6:sh(4)=8:sh(5)=10:sh(6)=11: rem sharpnotemap
  3390 pb = 0.44 : rem pitchandbend
  3391 dt = 1.05946309436 : rem dtandsemi
  3399 return
  3400 rem *** poll for playing of next song chunk
+ 3405 if t>=0 then gosub 3700 : rem poll digi state
  3410 if rplay(1) then return
  3412 gosub 3500 : rem prepare multi digis
- 3414 gosub 3700 : rem poll digi state
  3420 t = m(tt) : rem musicandchunkandindex = mapandbarandtoandchunk(barandindex)
+ 3424 if t = -3 then tt = 0: t = m(tt)
  3430 play v0$(t), v1$(t), v2$(t), v3$(t), v4$(t), v5$(t)
  3440 tt=tt+1
  3450 if m(tt) = -1 then tt = 0
@@ -289,19 +290,22 @@
  3800 rem *** poll digis ***
  3810 if id(dc) then begin
  3820   if ti > td(dc) then begin
- 3830     if not ir(dc) and sl(si(dc)) then gosub 8000 : rem end audio looping
+ 3830     if not ir(dc) and sl%(si(dc)) then gosub 8000 : rem end audio looping
  3840     id(dc) = 0
  3850     ir(dc) = 0
  3860   bend : else begin
  3870     return
  3880   bend
  3890 bend
- 3900 if dc=0 and ai(dc) >len(v6$(ci)) then ai(dc) = -1 : return
- 3901 if dc=1 and ai(dc) > len(v7$(ci)) then ai(dc) = -1 : return
- 3902 if dc=2 and ai(dc) >len(v8$(ci)) then ai(dc) = -1 : return
- 3903 if dc=3 and ai(dc) > len(v9$(ci)) then ai(dc) = -1 : return
+ 3900 if dc=0 and ai(dc) > len(v6$(t)) then ai(dc) = -1 : return
+ 3901 if dc=1 and ai(dc) > len(v7$(t)) then ai(dc) = -1 : return
+ 3902 if dc=2 and ai(dc) > len(v8$(t)) then ai(dc) = -1 : return
+ 3903 if dc=3 and ai(dc) > len(v9$(t)) then ai(dc) = -1 : return
  3910 if ai(dc) = -1 then return
  3920 if dc=0 then ch$ = mid$(v6$(t), ai(dc), 1)
+ 3921 if dc=1 then ch$ = mid$(v7$(t), ai(dc), 1)
+ 3922 if dc=2 then ch$ = mid$(v8$(t), ai(dc), 1)
+ 3923 if dc=3 then ch$ = mid$(v9$(t), ai(dc), 1)
  3930 if ss(dc) = 0 then begin
  3940   if ch$ = "%" then ss(dc) = 1
  3950   if ch$ = "#" then sf(dc) = 1
@@ -312,11 +316,11 @@
  4000     if ch$ >= "c" then k = asc(ch$) - asc("c")
  4010     if ch$ = "a" then k = 5
  4020     if ch$ = "b" then k = 6
- 4030     s = ra(si(dc))
+ 4030     sr = sr%(si(dc))
  4040     if sf(dc) then begin
- 4050       s = s * dt ^ (sh(k) + (oc(dc) - pb) * 12)
+ 4050       sr = sr * dt ^ (sh(k) + (oc(dc) - pb) * 12)
  4060     bend : else begin
- 4070       s = s * dt ^ (no(k) + (oc(dc) - pb) * 12)
+ 4070       sr = sr * dt ^ (nm(k) + (oc(dc) - pb) * 12)
  4080     bend
  4090     sf(dc) = 0
  4100     id(dc) = 1
@@ -347,7 +351,7 @@
  4350 bend : goto 4400 : rem goto skipseq
  4360 if ss(dc) = 1 then begin : rem seqandselectandsample
  4370   si(dc) = val(ch$)
- 4380   ss(dc) = seqmain
+ 4380   ss(dc) = 0 : rem seqmain
  4390 bend
  4400 rem skipandseq
  4410 ai(dc) = ai(dc) + 1
@@ -356,7 +360,7 @@
  7000 rem *** play with srate / playandvarandsrate ***
  7010 fs = ss%(si(dc)) : rem fstart = sampleandstart(sidx(dchan))
  7020 fp = sp%(si(dc)) : rem fplayback = sampleandplayback
- 7030 fl = sl%(si(dc)) : rem floop = sampleandloop
+ 7030 fl = so%(si(dc)) : rem floop = sampleandloop
  7040 fe = sf%(si(dc)) : rem fend = sampleandfinish
  7050 lp = sl%(si(dc)) : rem looping = sampleandlooping
  7060 gosub 7100 : rem gosub playandaudio
